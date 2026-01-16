@@ -156,8 +156,8 @@ export const TrendAnalysis = memo(function TrendAnalysis({
       <div className="space-y-2">
         <h4 className="text-xs text-text-muted uppercase tracking-wider">Monthly Contributions</h4>
 
-        <div className="h-44">
-          <ResponsiveContainer width="100%" height="100%">
+        <div className="h-44 min-w-[200px]">
+          <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
             <ComposedChart
               data={monthlyData}
               margin={CHART_MARGINS.withAxis}

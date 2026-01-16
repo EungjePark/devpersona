@@ -17,12 +17,9 @@ interface PublicGalleryResponse {
   images: SceneStellerImage[];
 }
 
-const SCENESTELLER_API_BASE =
-  process.env.NEXT_PUBLIC_SCENESTELLER_API_URL ||
-  "https://adorable-jackal-568.convex.site";
-
 /**
  * Fetch public gallery images for a user from SceneSteller
+ * Uses local API proxy to avoid CORS issues
  */
 export async function fetchSceneStellerGallery(
   userId: string,
@@ -31,32 +28,26 @@ export async function fetchSceneStellerGallery(
   if (!userId) return [];
 
   try {
-    const url = new URL(`${SCENESTELLER_API_BASE}/public-gallery`);
-    url.searchParams.set("userId", userId);
+    const url = new URL('/api/scenesteller/gallery', window.location.origin);
+    url.searchParams.set("username", userId);
     url.searchParams.set("limit", String(Math.min(Math.max(limit, 1), 50)));
 
     const response = await fetch(url.toString(), {
       headers: { Accept: "application/json" },
-      // Cache response for 60 seconds (Next.js ISR) to reduce API calls
-      // and improve performance while still showing relatively fresh data
-      next: { revalidate: 60 },
     });
 
     if (!response.ok) {
-      console.warn(`[SceneSteller] Failed to fetch gallery: ${response.status}`);
       return [];
     }
 
     const data = (await response.json()) as PublicGalleryResponse;
 
     if (!data.success || !Array.isArray(data.images)) {
-      console.warn("[SceneSteller] Invalid response format");
       return [];
     }
 
     return data.images.filter((img) => img.imageUrl);
-  } catch (error) {
-    console.warn("[SceneSteller] Error fetching gallery:", error);
+  } catch {
     return [];
   }
 }

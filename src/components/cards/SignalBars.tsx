@@ -108,8 +108,8 @@ function SignalRadarChart({
   );
 
   return (
-    <div className="h-64">
-      <ResponsiveContainer width="100%" height="100%">
+    <div className="h-64 min-w-[200px]">
+      <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
         <RadarChart data={radarData} cx="50%" cy="50%" outerRadius="80%">
           <PolarGrid stroke={CHART_THEME.grid} />
           <PolarAngleAxis

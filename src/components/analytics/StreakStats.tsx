@@ -44,8 +44,8 @@ function StreakGauge({
 
   return (
     <div className="relative flex flex-col items-center">
-      <div className="h-28 w-full">
-        <ResponsiveContainer width="100%" height="100%">
+      <div className="h-28 w-full min-w-[120px]">
+        <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
           <PieChart>
             <Pie
               data={data}

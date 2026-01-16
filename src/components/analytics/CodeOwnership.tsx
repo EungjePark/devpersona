@@ -101,8 +101,8 @@ function LanguagePieChart({ languages }: { languages: LanguageData[] }) {
   );
 
   return (
-    <div className="h-48">
-      <ResponsiveContainer width="100%" height="100%">
+    <div className="h-48 min-w-[150px]">
+      <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
         <PieChart>
           <Pie
             data={pieData}
