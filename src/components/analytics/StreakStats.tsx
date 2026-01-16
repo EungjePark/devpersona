@@ -1,7 +1,14 @@
 'use client';
 
 import { memo, useMemo } from 'react';
+import {
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+} from 'recharts';
 import type { ContributionStats } from '@/lib/types';
+import { CHART_THEME, CHART_ANIMATION } from '@/lib/chart-config';
 
 interface StreakStatsProps {
   contributions: ContributionStats;
@@ -15,6 +22,62 @@ const STREAK_MILESTONES = [
   { days: 100, name: 'Centurion', emoji: '💯' },
   { days: 365, name: 'Year Legend', emoji: '🏆' },
 ];
+
+// Semicircle gauge component using Recharts
+function StreakGauge({
+  value,
+  maxValue,
+  tierColor,
+  label,
+}: {
+  value: number;
+  maxValue: number;
+  tierColor: string;
+  label: string;
+}) {
+  const percentage = Math.min((value / maxValue) * 100, 100);
+
+  const data = [
+    { name: 'completed', value: percentage },
+    { name: 'remaining', value: 100 - percentage },
+  ];
+
+  return (
+    <div className="relative flex flex-col items-center">
+      <div className="h-28 w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={data}
+              cx="50%"
+              cy="90%"
+              startAngle={180}
+              endAngle={0}
+              innerRadius={60}
+              outerRadius={80}
+              paddingAngle={0}
+              dataKey="value"
+              animationDuration={CHART_ANIMATION.duration}
+              stroke="none"
+            >
+              <Cell fill={tierColor} />
+              <Cell fill={CHART_THEME.grid} />
+            </Pie>
+          </PieChart>
+        </ResponsiveContainer>
+      </div>
+      {/* Center value */}
+      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 text-center">
+        <div className="text-3xl font-black" style={{ color: tierColor }}>
+          {value}
+        </div>
+        <div className="text-[10px] text-text-muted uppercase tracking-wider">
+          {label}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export const StreakStats = memo(function StreakStats({
   contributions,
@@ -38,30 +101,37 @@ export const StreakStats = memo(function StreakStats({
     return STREAK_MILESTONES.filter(m => longestStreak >= m.days);
   }, [longestStreak]);
 
+  // Calculate gauge max value (next milestone or 365)
+  const gaugeMaxValue = nextMilestone?.days || 365;
+
   return (
     <div className="space-y-6">
-      {/* Main streak display */}
+      {/* Main streak display with gauges */}
       <div className="grid grid-cols-2 gap-4">
-        {/* Current streak */}
-        <div className="relative p-6 rounded-2xl bg-gradient-to-br from-orange-500/10 to-red-500/5 border border-orange-500/20 text-center overflow-hidden">
-          <div className="absolute top-2 right-2 text-3xl opacity-20">🔥</div>
-          <div className="text-5xl font-black mb-1" style={{ color: tierColor }}>
-            {currentStreak}
-          </div>
-          <div className="text-xs text-text-muted uppercase tracking-wider">Current Streak</div>
-          <div className="mt-2 text-sm text-text-secondary">
+        {/* Current streak gauge */}
+        <div className="relative p-4 rounded-2xl bg-gradient-to-br from-orange-500/10 to-red-500/5 border border-orange-500/20 overflow-hidden">
+          <div className="absolute top-2 right-2 text-2xl opacity-20">🔥</div>
+          <StreakGauge
+            value={currentStreak}
+            maxValue={gaugeMaxValue}
+            tierColor={tierColor}
+            label="Current Streak"
+          />
+          <div className="text-center mt-2 text-xs text-text-secondary">
             {currentStreak === 0 ? 'Start coding today!' : `${currentStreak} days and counting!`}
           </div>
         </div>
 
-        {/* Best streak */}
-        <div className="relative p-6 rounded-2xl bg-gradient-to-br from-yellow-500/10 to-amber-500/5 border border-yellow-500/20 text-center overflow-hidden">
-          <div className="absolute top-2 right-2 text-3xl opacity-20">🏆</div>
-          <div className="text-5xl font-black text-yellow-400 mb-1">
-            {longestStreak}
-          </div>
-          <div className="text-xs text-text-muted uppercase tracking-wider">Best Streak</div>
-          <div className="mt-2 text-sm text-text-secondary">
+        {/* Best streak gauge */}
+        <div className="relative p-4 rounded-2xl bg-gradient-to-br from-yellow-500/10 to-amber-500/5 border border-yellow-500/20 overflow-hidden">
+          <div className="absolute top-2 right-2 text-2xl opacity-20">🏆</div>
+          <StreakGauge
+            value={longestStreak}
+            maxValue={Math.max(longestStreak, 365)}
+            tierColor="#fbbf24"
+            label="Best Streak"
+          />
+          <div className="text-center mt-2 text-xs text-text-secondary">
             Your all-time record
           </div>
         </div>

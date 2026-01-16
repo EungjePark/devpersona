@@ -11,7 +11,7 @@ import { FIFACard, ContributionGraph, AchievementBadges, TierListComparison, Hex
 import { SceneStellerGallery } from '@/components/cards/SceneStellerGallery';
 import { LeaderboardPanel, DistributionChart, MiniLeaderboard } from '@/components/leaderboard';
 import { LanguageEvolution, NpmPerformance, CareerPhase } from '@/components/career';
-import { StreakStats, CodingPatterns, TrendAnalysis, CodeOwnership } from '@/components/analytics';
+import { StreakStats, CodingPatterns, TrendAnalysis, CodeOwnership, StarSummary, TopRepositories } from '@/components/analytics';
 import { PoweredBySceneSteller } from '@/components/SceneStellerBranding';
 import { SceneStellerMiniCTA } from '@/components/SceneStellerMiniCTA';
 import { ProfileTabs, TabPanel, type TabId, isValidTabId } from '@/components/layout/ProfileTabs';
@@ -451,6 +451,40 @@ ${shareUrl}`;
                     )}
                   </div>
                 </div>
+
+                {/* GitHub Impact Section */}
+                {result.totalStars !== undefined && result.totalStars > 0 && (
+                  <div className="grid lg:grid-cols-2 gap-6 mt-8">
+                    {/* Star Summary */}
+                    <div className="bg-bg-secondary/50 backdrop-blur-md rounded-2xl p-6 border border-white/5">
+                      <h3 className="text-sm font-semibold text-text-secondary mb-4 flex items-center gap-2 uppercase tracking-wider">
+                        <span>⭐</span> GitHub Impact
+                      </h3>
+                      <StarSummary
+                        totalStars={result.totalStars}
+                        totalForks={result.totalForks ?? 0}
+                        repoCount={result.repoCount ?? 0}
+                        starRank={result.starRank}
+                        percentile={result.starPercentile}
+                        totalRanked={result.totalRankedUsers}
+                        tierColor={result.tier.color}
+                        username={result.username}
+                      />
+                    </div>
+
+                    {/* Top Repositories */}
+                    <div className="bg-bg-secondary/50 backdrop-blur-md rounded-2xl p-6 border border-white/5">
+                      <h3 className="text-sm font-semibold text-text-secondary mb-4 flex items-center gap-2 uppercase tracking-wider">
+                        <span>📦</span> Top Repositories
+                      </h3>
+                      <TopRepositories
+                        repos={result.topRepos ?? []}
+                        tierColor={result.tier.color}
+                        username={result.username}
+                      />
+                    </div>
+                  </div>
+                )}
 
                 {/* Action Buttons */}
                 <div className="flex flex-wrap justify-center gap-4 mt-8">

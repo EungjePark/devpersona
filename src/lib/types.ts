@@ -218,6 +218,16 @@ export interface ContributionStats {
   averagePerDay: number;
 }
 
+// Repository summary for top repos display
+export interface RepositorySummary {
+  name: string;
+  fullName: string;
+  stars: number;
+  forks: number;
+  language?: string;
+  description?: string;
+}
+
 // Analysis result
 export interface AnalysisResult {
   username: string;
@@ -233,7 +243,15 @@ export interface AnalysisResult {
   npmPackages: NpmPackage[];
   hnStats: { points: number; comments: number; topPost?: string };
   contributions: ContributionStats | null;
-  totalStars?: number;  // Total GitHub stars across all repos
+  // GitHub star/repo data
+  totalStars?: number;
+  totalForks?: number;
+  repoCount?: number;
+  topRepos?: RepositorySummary[];
+  // Star ranking data
+  starRank?: number | null;
+  starPercentile?: number | null;
+  totalRankedUsers?: number;
   analyzedAt: string;
 }
 

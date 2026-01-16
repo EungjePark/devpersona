@@ -10,8 +10,11 @@
 
 import type * as analyses from "../analyses.js";
 import type * as crons from "../crons.js";
+import type * as globalRankings from "../globalRankings.js";
+import type * as repositories from "../repositories.js";
 import type * as seed from "../seed.js";
 import type * as stats from "../stats.js";
+import type * as users from "../users.js";
 
 import type {
   ApiFromModules,
@@ -22,8 +25,11 @@ import type {
 declare const fullApi: ApiFromModules<{
   analyses: typeof analyses;
   crons: typeof crons;
+  globalRankings: typeof globalRankings;
+  repositories: typeof repositories;
   seed: typeof seed;
   stats: typeof stats;
+  users: typeof users;
 }>;
 
 /**

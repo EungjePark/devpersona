@@ -279,7 +279,7 @@ export const CodeOwnership = memo(function CodeOwnership({
               </div>
               <div className="h-2.5 bg-white/5 rounded-full overflow-hidden">
                 <div
-                  className="h-full rounded-full bg-gradient-to-r from-purple-500 to-pink-500"
+                  className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-indigo-400"
                   style={{ width: `${metrics.diversity}%` }}
                 />
               </div>

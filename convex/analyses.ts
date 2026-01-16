@@ -6,7 +6,7 @@ import type { DataModel, Doc, Id } from "./_generated/dataModel";
 type QueryCtx = GenericQueryCtx<DataModel>;
 type MutationCtx = GenericMutationCtx<DataModel>;
 
-// Analysis args type
+// Analysis args type - extended with star/follower data
 const analysisArgs = {
   username: v.string(),
   avatarUrl: v.string(),
@@ -21,6 +21,11 @@ const analysisArgs = {
   tier: v.string(),
   archetypeId: v.string(),
   analyzedAt: v.number(),
+  // NEW: Extended metrics
+  totalStars: v.optional(v.number()),
+  totalForks: v.optional(v.number()),
+  followers: v.optional(v.number()),
+  topLanguage: v.optional(v.string()),
 };
 
 type AnalysisArgs = {
@@ -37,6 +42,10 @@ type AnalysisArgs = {
   tier: string;
   archetypeId: string;
   analyzedAt: number;
+  totalStars?: number;
+  totalForks?: number;
+  followers?: number;
+  topLanguage?: string;
 };
 
 // Mutation: Save/update analysis result (upsert by username)
@@ -114,6 +123,57 @@ export const getUserRank = query({
       total: snapshot.totalUsers,
       percentile,
     };
+  },
+});
+
+// Query: Get star rank for a user
+export const getStarRank = query({
+  args: { username: v.string() },
+  handler: async (ctx: QueryCtx, { username }: { username: string }) => {
+    const user = await ctx.db
+      .query("analyses")
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .withIndex("by_username", (q: any) => q.eq("username", username))
+      .first();
+
+    if (!user || user.totalStars === undefined) {
+      return { rank: null, total: 0, percentile: null };
+    }
+
+    // Get all analyses with stars
+    const allAnalyses = await ctx.db.query("analyses").collect();
+    const withStars = allAnalyses.filter(a => a.totalStars !== undefined && a.totalStars > 0);
+    const sortedByStars = withStars.sort((a, b) => (b.totalStars || 0) - (a.totalStars || 0));
+
+    const rank = sortedByStars.findIndex(a => a.username === username) + 1;
+    const total = sortedByStars.length;
+    const percentile = total > 0 ? Math.round(((total - rank + 1) / total) * 100) : 0;
+
+    return { rank, total, percentile };
+  },
+});
+
+// Query: Get top analyses by stars
+export const getTopByStars = query({
+  args: { limit: v.optional(v.number()) },
+  handler: async (ctx: QueryCtx, { limit = 50 }: { limit?: number }) => {
+    const allAnalyses = await ctx.db.query("analyses").collect();
+    return allAnalyses
+      .filter(a => a.totalStars !== undefined && a.totalStars > 0)
+      .sort((a, b) => (b.totalStars || 0) - (a.totalStars || 0))
+      .slice(0, limit);
+  },
+});
+
+// Query: Get top analyses by followers
+export const getTopByFollowers = query({
+  args: { limit: v.optional(v.number()) },
+  handler: async (ctx: QueryCtx, { limit = 50 }: { limit?: number }) => {
+    const allAnalyses = await ctx.db.query("analyses").collect();
+    return allAnalyses
+      .filter(a => a.followers !== undefined && a.followers > 0)
+      .sort((a, b) => (b.followers || 0) - (a.followers || 0))
+      .slice(0, limit);
   },
 });
 

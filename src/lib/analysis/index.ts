@@ -70,8 +70,24 @@ export async function analyzeUser(
   const pattern = detectActivityPattern(commits);
   const languages = getLanguageDistribution(repos);
 
-  // Calculate total stars across all repos for GlobalRanking
+  // Calculate repo statistics
   const totalStars = repos.reduce((sum, repo) => sum + repo.stargazers_count, 0);
+  const totalForks = repos.reduce((sum, repo) => sum + repo.forks_count, 0);
+  const repoCount = repos.length;
+
+  // Get top repositories sorted by stars
+  const topRepos = repos
+    .filter(repo => !repo.archived)
+    .sort((a, b) => b.stargazers_count - a.stargazers_count)
+    .slice(0, 5)
+    .map(repo => ({
+      name: repo.name,
+      fullName: repo.full_name,
+      stars: repo.stargazers_count,
+      forks: repo.forks_count,
+      language: repo.language ?? undefined,
+      description: repo.description ?? undefined,
+    }));
 
   return {
     username: user.login,
@@ -92,6 +108,9 @@ export async function analyzeUser(
     },
     contributions,
     totalStars,
+    totalForks,
+    repoCount,
+    topRepos,
     analyzedAt: new Date().toISOString(),
   };
 }

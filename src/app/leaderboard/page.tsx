@@ -1,40 +1,70 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { ConvexClientProvider } from '@/components/ConvexClientProvider';
 import { TIERS, type TierLevel } from '@/lib/types';
-import type { TopUser } from '@/lib/leaderboard-types';
+import {
+  type TopUser,
+  type RankingCategory,
+  sortUsersByCategory,
+  formatCompactNumber,
+} from '@/lib/leaderboard-types';
 import { cn } from '@/lib/utils';
 
 // Demo users for when no real data exists
 const DEMO_USERS: TopUser[] = [
-  { username: 'torvalds', avatarUrl: 'https://avatars.githubusercontent.com/u/1024025?v=4', overallRating: 98, tier: 'S', archetypeId: 'maintainer' },
-  { username: 'gaearon', avatarUrl: 'https://avatars.githubusercontent.com/u/810438?v=4', overallRating: 94, tier: 'S', archetypeId: 'specialist' },
-  { username: 'sindresorhus', avatarUrl: 'https://avatars.githubusercontent.com/u/170270?v=4', overallRating: 91, tier: 'S', archetypeId: 'silent_builder' },
-  { username: 'shadcn', avatarUrl: 'https://avatars.githubusercontent.com/u/124599?v=4', overallRating: 89, tier: 'A', archetypeId: 'specialist' },
-  { username: 'yyx990803', avatarUrl: 'https://avatars.githubusercontent.com/u/499550?v=4', overallRating: 95, tier: 'S', archetypeId: 'maintainer' },
-  { username: 'tannerlinsley', avatarUrl: 'https://avatars.githubusercontent.com/u/5580297?v=4', overallRating: 87, tier: 'A', archetypeId: 'maintainer' },
-  { username: 'tj', avatarUrl: 'https://avatars.githubusercontent.com/u/25254?v=4', overallRating: 88, tier: 'A', archetypeId: 'prototype_machine' },
-  { username: 'getify', avatarUrl: 'https://avatars.githubusercontent.com/u/150330?v=4', overallRating: 82, tier: 'A', archetypeId: 'archivist' },
-  { username: 'addyosmani', avatarUrl: 'https://avatars.githubusercontent.com/u/110953?v=4', overallRating: 85, tier: 'A', archetypeId: 'hype_surfer' },
-  { username: 'rauchg', avatarUrl: 'https://avatars.githubusercontent.com/u/13041?v=4', overallRating: 86, tier: 'A', archetypeId: 'specialist' },
+  { username: 'torvalds', avatarUrl: 'https://avatars.githubusercontent.com/u/1024025?v=4', overallRating: 98, tier: 'S', archetypeId: 'maintainer', totalStars: 180200, followers: 215000, topLanguage: 'C' },
+  { username: 'gaearon', avatarUrl: 'https://avatars.githubusercontent.com/u/810438?v=4', overallRating: 94, tier: 'S', archetypeId: 'specialist', totalStars: 145800, followers: 89000, topLanguage: 'JavaScript' },
+  { username: 'sindresorhus', avatarUrl: 'https://avatars.githubusercontent.com/u/170270?v=4', overallRating: 91, tier: 'S', archetypeId: 'silent_builder', totalStars: 120500, followers: 75000, topLanguage: 'TypeScript' },
+  { username: 'shadcn', avatarUrl: 'https://avatars.githubusercontent.com/u/124599?v=4', overallRating: 89, tier: 'A', archetypeId: 'specialist', totalStars: 89000, followers: 45000, topLanguage: 'TypeScript' },
+  { username: 'yyx990803', avatarUrl: 'https://avatars.githubusercontent.com/u/499550?v=4', overallRating: 95, tier: 'S', archetypeId: 'maintainer', totalStars: 210000, followers: 120000, topLanguage: 'JavaScript' },
+  { username: 'tannerlinsley', avatarUrl: 'https://avatars.githubusercontent.com/u/5580297?v=4', overallRating: 87, tier: 'A', archetypeId: 'maintainer', totalStars: 78000, followers: 35000, topLanguage: 'TypeScript' },
+  { username: 'tj', avatarUrl: 'https://avatars.githubusercontent.com/u/25254?v=4', overallRating: 88, tier: 'A', archetypeId: 'prototype_machine', totalStars: 98000, followers: 67000, topLanguage: 'Go' },
+  { username: 'getify', avatarUrl: 'https://avatars.githubusercontent.com/u/150330?v=4', overallRating: 82, tier: 'A', archetypeId: 'archivist', totalStars: 45000, followers: 32000, topLanguage: 'JavaScript' },
+  { username: 'addyosmani', avatarUrl: 'https://avatars.githubusercontent.com/u/110953?v=4', overallRating: 85, tier: 'A', archetypeId: 'hype_surfer', totalStars: 56000, followers: 55000, topLanguage: 'JavaScript' },
+  { username: 'rauchg', avatarUrl: 'https://avatars.githubusercontent.com/u/13041?v=4', overallRating: 86, tier: 'A', archetypeId: 'specialist', totalStars: 67000, followers: 85000, topLanguage: 'TypeScript' },
+];
+
+// Ranking tab configuration
+const RANKING_TABS: { id: RankingCategory; label: string; icon: string }[] = [
+  { id: 'rating', label: 'OVR Rating', icon: '🏆' },
+  { id: 'stars', label: 'Total Stars', icon: '⭐' },
+  { id: 'followers', label: 'Followers', icon: '👥' },
 ];
 
 function LeaderboardContent() {
   const [filter, setFilter] = useState<'all' | TierLevel>('all');
+  const [rankingCategory, setRankingCategory] = useState<RankingCategory>('rating');
   const snapshot = useQuery(api.analyses.getLeaderboardSnapshot);
 
   const topUsers = snapshot?.topUsers?.length ? snapshot.topUsers : DEMO_USERS;
   const isDemo = !snapshot?.topUsers?.length;
   const totalUsers = snapshot?.totalUsers ?? 100;
 
-  const filteredUsers = filter === 'all'
-    ? topUsers
-    : topUsers.filter((u: TopUser) => u.tier === filter);
+  // Filter by tier, then sort by category
+  const sortedAndFilteredUsers = useMemo(() => {
+    const filtered = filter === 'all'
+      ? topUsers
+      : topUsers.filter((u: TopUser) => u.tier === filter);
+    return sortUsersByCategory(filtered, rankingCategory);
+  }, [topUsers, filter, rankingCategory]);
+
+  // Get value to display based on category
+  const getDisplayValue = (user: TopUser): string => {
+    switch (rankingCategory) {
+      case 'stars':
+        return user.totalStars ? formatCompactNumber(user.totalStars) : '-';
+      case 'followers':
+        return user.followers ? formatCompactNumber(user.followers) : '-';
+      case 'rating':
+      default:
+        return user.overallRating.toString();
+    }
+  };
 
   return (
     <div className="min-h-screen relative overflow-hidden">
@@ -60,13 +90,32 @@ function LeaderboardContent() {
         </div>
 
         {/* Title */}
-        <div className="text-center mb-12">
+        <div className="text-center mb-8">
           <h1 className="text-4xl md:text-5xl font-black mb-4 tracking-tight">
             Global <span className="text-gradient-primary">Leaderboard</span>
           </h1>
           <p className="text-text-secondary">
-            Top developers ranked by overall rating • {totalUsers.toLocaleString()} developers analyzed
+            {totalUsers.toLocaleString()} developers analyzed
           </p>
+        </div>
+
+        {/* Ranking Category Tabs */}
+        <div className="flex justify-center gap-2 mb-6">
+          {RANKING_TABS.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setRankingCategory(tab.id)}
+              className={cn(
+                'flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium text-sm transition-all',
+                rankingCategory === tab.id
+                  ? 'bg-primary-500/20 border border-primary-500/40 text-white'
+                  : 'bg-white/[0.02] border border-white/5 text-text-muted hover:text-white hover:bg-white/5'
+              )}
+            >
+              <span>{tab.icon}</span>
+              <span>{tab.label}</span>
+            </button>
+          ))}
         </div>
 
         {/* Tier Filter */}
@@ -94,17 +143,20 @@ function LeaderboardContent() {
         {/* Leaderboard Table */}
         <div className="glass-panel rounded-2xl overflow-hidden">
           {/* Header */}
-          <div className="grid grid-cols-[60px_1fr_100px_100px_80px] gap-4 px-6 py-4 border-b border-white/5 bg-white/[0.02]">
+          <div className="grid grid-cols-[60px_1fr_100px_100px_80px_80px] gap-4 px-6 py-4 border-b border-white/5 bg-white/[0.02]">
             <div className="text-xs font-bold text-text-muted">RANK</div>
             <div className="text-xs font-bold text-text-muted">DEVELOPER</div>
             <div className="text-xs font-bold text-text-muted text-center">TIER</div>
-            <div className="text-xs font-bold text-text-muted text-center">TYPE</div>
-            <div className="text-xs font-bold text-text-muted text-right">OVR</div>
+            <div className="text-xs font-bold text-text-muted text-center">LANG</div>
+            <div className="text-xs font-bold text-text-muted text-right">
+              {rankingCategory === 'stars' ? '⭐ STARS' : rankingCategory === 'followers' ? '👥 FOLLOW' : 'OVR'}
+            </div>
+            <div className="text-xs font-bold text-text-muted text-right">TYPE</div>
           </div>
 
           {/* Rows */}
           <div className="divide-y divide-white/5">
-            {filteredUsers.slice(0, 50).map((user: TopUser, index: number) => {
+            {sortedAndFilteredUsers.slice(0, 50).map((user: TopUser, index: number) => {
               const tier = TIERS[user.tier as TierLevel];
               const rank = index + 1;
 
@@ -112,7 +164,7 @@ function LeaderboardContent() {
                 <Link
                   key={user.username}
                   href={`/analyze/${user.username}`}
-                  className="grid grid-cols-[60px_1fr_100px_100px_80px] gap-4 px-6 py-4 hover:bg-white/[0.03] transition-colors group"
+                  className="grid grid-cols-[60px_1fr_100px_100px_80px_80px] gap-4 px-6 py-4 hover:bg-white/[0.03] transition-colors group"
                 >
                   {/* Rank */}
                   <div className="flex items-center">
@@ -158,20 +210,27 @@ function LeaderboardContent() {
                     </span>
                   </div>
 
-                  {/* Archetype */}
+                  {/* Top Language */}
                   <div className="flex items-center justify-center">
-                    <span className="text-xs text-text-secondary font-medium uppercase">
-                      {user.archetypeId.replace('_', ' ')}
+                    <span className="text-xs text-text-secondary font-medium">
+                      {user.topLanguage || '-'}
                     </span>
                   </div>
 
-                  {/* OVR */}
+                  {/* Main Value (Rating/Stars/Followers) */}
                   <div className="flex items-center justify-end">
                     <span
-                      className="text-2xl font-black"
+                      className="text-xl font-black"
                       style={{ color: tier.color }}
                     >
-                      {user.overallRating}
+                      {getDisplayValue(user)}
+                    </span>
+                  </div>
+
+                  {/* Archetype */}
+                  <div className="flex items-center justify-end">
+                    <span className="text-[10px] text-text-muted font-medium uppercase truncate">
+                      {user.archetypeId.replace('_', ' ')}
                     </span>
                   </div>
                 </Link>
@@ -179,7 +238,7 @@ function LeaderboardContent() {
             })}
           </div>
 
-          {filteredUsers.length === 0 && (
+          {sortedAndFilteredUsers.length === 0 && (
             <div className="py-12 text-center text-text-muted">
               No developers found in this tier
             </div>

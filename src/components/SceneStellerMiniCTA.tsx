@@ -23,6 +23,22 @@ const ARCHETYPE_PROMPTS: Record<ArchetypeId, string> = {
   ghost: 'ethereal presence, barely visible, mysterious',
 };
 
+// Tier-based CTA messages
+const TIER_MESSAGES: Record<TierLevel, string> = {
+  S: 'Your LEGENDARY portrait awaits',
+  A: 'Your EPIC scene awaits',
+  B: 'Your RARE moment awaits',
+  C: 'Your journey begins',
+};
+
+// Use indigo colors that align with DevPersona design system
+const TIER_COLORS: Record<TierLevel, { from: string; to: string; border: string }> = {
+  S: { from: '#fbbf24', to: '#d97706', border: '#fbbf2460' },  // Amber/Gold
+  A: { from: '#6366f1', to: '#4f46e5', border: '#6366f160' },  // Indigo
+  B: { from: '#3b82f6', to: '#2563eb', border: '#3b82f660' },  // Blue
+  C: { from: '#64748b', to: '#475569', border: '#64748b60' },  // Slate
+};
+
 interface SceneStellerMiniCTAProps {
   username: string;
   tier: TierLevel;
@@ -63,34 +79,42 @@ export const SceneStellerMiniCTA = memo(function SceneStellerMiniCTA({
       ref: 'devpersona',
       type: 'card',
       prompt: truncatedPrompt,
+      tier: tier,
     });
     window.open(`${baseUrl}?${params.toString()}`, '_blank');
-  }, [autoPrompt]);
+  }, [autoPrompt, tier]);
 
-  // Get tier color from TIER_DESIGN_TOKENS
-  const tierColors: Record<TierLevel, { from: string; to: string }> = {
-    S: { from: '#ffd700', to: '#ffc300' },
-    A: { from: '#a855f7', to: '#8b5cf6' },
-    B: { from: '#3b82f6', to: '#2563eb' },
-    C: { from: '#6b7280', to: '#4b5563' },
-  };
-  const colors = tierColors[tier];
+  const colors = TIER_COLORS[tier];
+  const message = TIER_MESSAGES[tier];
 
   return (
     <button
       onClick={handleClick}
-      className="group relative overflow-hidden rounded-xl px-4 py-2.5 transition-all duration-300 hover:scale-[1.02]"
+      className="group relative overflow-hidden rounded-xl px-4 py-3 transition-all duration-300 hover:scale-[1.02] w-full"
       style={{
-        background: `linear-gradient(135deg, ${colors.from}30, ${colors.to}20)`,
+        background: `linear-gradient(135deg, ${colors.from}20, ${colors.to}10)`,
         borderWidth: 1,
-        borderColor: `${colors.from}40`,
+        borderColor: colors.border,
       }}
     >
       <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-      <div className="relative flex items-center gap-2">
-        <span className="text-lg">🎨</span>
-        <span className="text-sm font-semibold text-white">Create Your Art</span>
-        <span className="text-xs opacity-60 group-hover:opacity-100 transition-opacity">↗</span>
+      <div className="relative flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <span className="text-xl">🎨</span>
+          <div className="text-left">
+            <span className="text-sm font-semibold text-white block">{message}</span>
+            <span className="text-[10px] text-text-muted">Powered by SceneSteller AI</span>
+          </div>
+        </div>
+        <span
+          className="text-xs font-bold px-2 py-1 rounded"
+          style={{
+            backgroundColor: `${colors.from}30`,
+            color: colors.from,
+          }}
+        >
+          Create →
+        </span>
       </div>
     </button>
   );

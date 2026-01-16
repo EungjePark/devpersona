@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, memo } from 'react';
 import {
   Radar,
   RadarChart,
@@ -221,7 +221,7 @@ function SignalBarList({
   );
 }
 
-export function SignalBars({
+export const SignalBars = memo(function SignalBars({
   signals,
   className = '',
   showGrade = true,
@@ -269,7 +269,7 @@ export function SignalBars({
       )}
     </div>
   );
-}
+});
 
 // Compact 2-column grid version
 export function SignalBarsGrid({

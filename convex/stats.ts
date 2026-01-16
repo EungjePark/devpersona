@@ -34,6 +34,18 @@ function calculateDistribution(
     .sort((a, b) => parseInt(a.bucket) - parseInt(b.bucket));
 }
 
+// Extended top user type for leaderboard
+interface ExtendedTopUser {
+  username: string;
+  avatarUrl: string;
+  overallRating: number;
+  tier: string;
+  archetypeId: string;
+  totalStars?: number;
+  followers?: number;
+  topLanguage?: string;
+}
+
 // Internal action: Update leaderboard snapshot (called by cron)
 export const updateLeaderboardSnapshot = internalAction({
   handler: async (ctx: ActionCtx) => {
@@ -46,12 +58,15 @@ export const updateLeaderboardSnapshot = internalAction({
 
     // 2. Sort by rating and extract top 50
     const sorted = [...all].sort((a, b) => b.overallRating - a.overallRating);
-    const topUsers = sorted.slice(0, 50).map((a) => ({
+    const topUsers: ExtendedTopUser[] = sorted.slice(0, 50).map((a) => ({
       username: a.username,
       avatarUrl: a.avatarUrl,
       overallRating: a.overallRating,
       tier: a.tier,
       archetypeId: a.archetypeId,
+      totalStars: a.totalStars,
+      followers: a.followers,
+      topLanguage: a.topLanguage,
     }));
 
     // 3. Calculate distribution
@@ -79,12 +94,15 @@ export const refreshLeaderboard = action({
 
     // Sort by rating and extract top 50
     const sorted = [...all].sort((a, b) => b.overallRating - a.overallRating);
-    const topUsers = sorted.slice(0, 50).map((a) => ({
+    const topUsers: ExtendedTopUser[] = sorted.slice(0, 50).map((a) => ({
       username: a.username,
       avatarUrl: a.avatarUrl,
       overallRating: a.overallRating,
       tier: a.tier,
       archetypeId: a.archetypeId,
+      totalStars: a.totalStars,
+      followers: a.followers,
+      topLanguage: a.topLanguage,
     }));
 
     // Calculate distribution
@@ -100,7 +118,7 @@ export const refreshLeaderboard = action({
   },
 });
 
-// Internal mutation: Upsert leaderboard snapshot
+// Internal mutation: Upsert leaderboard snapshot (extended)
 export const upsertSnapshot = internalMutation({
   args: {
     topUsers: v.array(
@@ -110,6 +128,9 @@ export const upsertSnapshot = internalMutation({
         overallRating: v.number(),
         tier: v.string(),
         archetypeId: v.string(),
+        totalStars: v.optional(v.number()),
+        followers: v.optional(v.number()),
+        topLanguage: v.optional(v.string()),
       })
     ),
     distribution: v.array(
@@ -120,7 +141,7 @@ export const upsertSnapshot = internalMutation({
     ),
     totalUsers: v.number(),
   },
-  handler: async (ctx: MutationCtx, args: LeaderboardSnapshot) => {
+  handler: async (ctx: MutationCtx, args: LeaderboardSnapshot & { topUsers: ExtendedTopUser[] }) => {
     // Check for existing snapshot
     const existing = await ctx.db
       .query("stats")
