@@ -2,7 +2,6 @@
 
 import { memo, useMemo } from 'react';
 import type { ContributionStats } from '@/lib/types';
-import { cn } from '@/lib/utils';
 
 interface StreakStatsProps {
   contributions: ContributionStats;

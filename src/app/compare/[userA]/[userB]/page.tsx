@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState, use } from 'react';
+import { useEffect, useState, use, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { CompareChart, ContributionGraph } from '@/components/cards';
+import { CompareChart } from '@/components/cards';
 import { analyzeUser } from '@/lib/analysis';
 import { TIERS, SIGNAL_LABELS, type AnalysisResult, type TierLevel, type SignalScores } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -116,8 +116,9 @@ function UserCard({ result, isWinner, side }: { result: AnalysisResult; isWinner
 }
 
 function StatCompareRow({ label, emoji, valueA, valueB }: { label: string; emoji: string; valueA: number; valueB: number }) {
-  const diff = valueA - valueB;
-  const maxValue = Math.max(valueA, valueB, 1);
+  // Reserved for future enhanced comparison UI (percentage bars, diff indicators)
+  void (valueA - valueB); // diff
+  void Math.max(valueA, valueB, 1); // maxValue
 
   return (
     <div className="grid grid-cols-[1fr_100px_1fr] gap-4 items-center py-3 border-b border-white/5 last:border-0">
@@ -243,7 +244,7 @@ export default function ComparePage({ params }: ComparePageProps) {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const runComparison = async () => {
+  const runComparison = useCallback(async () => {
     setIsLoading(true);
     setError(null);
 
@@ -260,11 +261,11 @@ export default function ComparePage({ params }: ComparePageProps) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [userA, userB]);
 
   useEffect(() => {
     runComparison();
-  }, [userA, userB]);
+  }, [runComparison]);
 
   const winner = resultA && resultB
     ? resultA.overallRating > resultB.overallRating

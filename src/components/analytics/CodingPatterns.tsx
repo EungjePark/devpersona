@@ -2,7 +2,6 @@
 
 import { memo, useMemo } from 'react';
 import type { ContributionStats, ActivityPattern } from '@/lib/types';
-import { cn } from '@/lib/utils';
 
 interface CodingPatternsProps {
   contributions: ContributionStats;
@@ -119,16 +118,20 @@ export const CodingPatterns = memo(function CodingPatterns({
           ))}
         </div>
 
-        {/* Heatmap grid */}
+        {/* Heatmap grid - larger cells */}
         {heatmapData.map((row, hourIdx) => (
-          <div key={hourIdx} className="flex items-center">
-            <div className="w-20 text-[10px] text-text-muted pr-2 text-right">
+          <div key={hourIdx} className="flex items-center gap-1">
+            <div className="w-20 text-[10px] text-text-muted pr-2 text-right flex-shrink-0">
               {HOUR_BLOCKS[hourIdx]}
             </div>
             {row.map((intensity, dayIdx) => (
-              <div key={dayIdx} className="flex-1 p-0.5">
+              <div
+                key={dayIdx}
+                className="flex-1 group relative"
+                title={`${DAYS[dayIdx]} ${HOUR_BLOCKS[hourIdx]}: ${Math.round(intensity * 100)}% activity`}
+              >
                 <div
-                  className="w-full aspect-square rounded"
+                  className="w-full h-4 rounded-sm transition-transform hover:scale-105"
                   style={{
                     backgroundColor: intensity > 0
                       ? `${tierColor}${Math.round(intensity * 100).toString(16).padStart(2, '0')}`
@@ -139,6 +142,21 @@ export const CodingPatterns = memo(function CodingPatterns({
             ))}
           </div>
         ))}
+
+        {/* Activity Legend */}
+        <div className="flex items-center justify-center gap-4 mt-4 pt-4 border-t border-white/5">
+          <span className="text-[10px] text-text-muted">Low</span>
+          <div className="flex gap-1">
+            {[0.2, 0.4, 0.6, 0.8, 1.0].map((level) => (
+              <div
+                key={level}
+                className="w-4 h-4 rounded-sm"
+                style={{ backgroundColor: `${tierColor}${Math.round(level * 100).toString(16).padStart(2, '0')}` }}
+              />
+            ))}
+          </div>
+          <span className="text-[10px] text-text-muted">High</span>
+        </div>
       </div>
 
       {/* Quick insights */}

@@ -2,6 +2,7 @@
 
 import { memo, useMemo } from 'react';
 import type { ContributionStats } from '@/lib/types';
+import { formatCompact } from '@/lib/format';
 
 interface TrendAnalysisProps {
   contributions: ContributionStats;
@@ -100,37 +101,52 @@ export const TrendAnalysis = memo(function TrendAnalysis({
         </div>
       )}
 
-      {/* Monthly chart */}
+      {/* Monthly chart - taller */}
       <div className="space-y-2">
         <h4 className="text-xs text-text-muted uppercase tracking-wider">Monthly Contributions</h4>
 
-        <div className="flex items-end gap-1 h-32">
-          {monthlyData.map((month, index) => (
-            <div
-              key={`${month.year}-${month.label}`}
-              className="flex-1 flex flex-col items-center group"
-            >
-              {/* Bar */}
-              <div className="w-full flex-1 flex items-end">
-                <div
-                  className="w-full rounded-t transition-all duration-300 group-hover:opacity-80"
-                  style={{
-                    height: `${month.percentage}%`,
-                    minHeight: month.count > 0 ? '4px' : '0',
-                    backgroundColor: tierColor,
-                  }}
-                />
-              </div>
+        <div className="flex items-end gap-1.5 h-36">
+          {monthlyData.map((month) => {
+            const isHighValue = month.count > 50;
+            const isBestMonth = month.count === bestMonth.count && month.count > 0;
 
-              {/* Label */}
-              <div className="text-[9px] text-text-muted mt-1">{month.label}</div>
+            return (
+              <div
+                key={`${month.year}-${month.label}`}
+                className="flex-1 flex flex-col items-center group relative"
+              >
+                {/* Value label above bar for high values */}
+                {isHighValue && (
+                  <span className="text-[9px] text-text-muted mb-1 opacity-0 group-hover:opacity-100 transition-opacity tabular-nums">
+                    {formatCompact(month.count, 0)}
+                  </span>
+                )}
 
-              {/* Tooltip */}
-              <div className="absolute bottom-full mb-2 px-2 py-1 rounded bg-bg-primary border border-white/10 text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                {month.label} {month.year}: {month.count} contributions
+                {/* Bar */}
+                <div className="w-full flex-1 flex items-end">
+                  <div
+                    className={`w-full rounded-t transition-all duration-300 group-hover:opacity-80 ${isBestMonth ? 'ring-1 ring-white/30' : ''}`}
+                    style={{
+                      height: `${month.percentage}%`,
+                      minHeight: month.count > 0 ? '4px' : '0',
+                      backgroundColor: tierColor,
+                      boxShadow: isBestMonth ? `0 0 12px ${tierColor}50` : undefined,
+                    }}
+                  />
+                </div>
+
+                {/* Label */}
+                <div className={`text-[9px] mt-1 ${isBestMonth ? 'text-white font-bold' : 'text-text-muted'}`}>
+                  {month.label}
+                </div>
+
+                {/* Tooltip */}
+                <div className="absolute bottom-full mb-2 px-2 py-1 rounded bg-bg-primary border border-white/10 text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                  {month.label} {month.year}: {month.count.toLocaleString()} contributions
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 

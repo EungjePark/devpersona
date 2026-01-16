@@ -70,6 +70,9 @@ export async function analyzeUser(
   const pattern = detectActivityPattern(commits);
   const languages = getLanguageDistribution(repos);
 
+  // Calculate total stars across all repos for GlobalRanking
+  const totalStars = repos.reduce((sum, repo) => sum + repo.stargazers_count, 0);
+
   return {
     username: user.login,
     avatarUrl: user.avatar_url,
@@ -88,6 +91,7 @@ export async function analyzeUser(
       topPost: hnStats.topPost?.title,
     },
     contributions,
+    totalStars,
     analyzedAt: new Date().toISOString(),
   };
 }

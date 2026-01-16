@@ -46,7 +46,8 @@ const ARCHETYPE_DISPLAY: Record<ArchetypeId, { abbrev: string; full: string }> =
 export function FIFACard({
   username,
   avatarUrl,
-  signals: _signals,
+  // signals prop accepted for API compatibility but displayed via overallRating
+  signals: _signals = {} as SignalScores,
   overallRating,
   tier,
   archetypeId,
@@ -55,6 +56,8 @@ export function FIFACard({
   rank,
   className,
 }: FIFACardProps) {
+  // Suppress unused variable warning - signals available for future enhancements
+  void _signals;
   const tierStyle = TIER_STYLES[tier.level] ?? TIER_STYLES.C;
   const tierColor = TIER_BG_COLORS[tier.level] ?? '#52525b';
   const archetype = ARCHETYPE_DISPLAY[archetypeId] ?? { abbrev: 'DEV', full: archetypeName };

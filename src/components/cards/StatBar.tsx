@@ -10,14 +10,24 @@ interface StatBarProps {
   compact?: boolean; // For 2-column layout
 }
 
+// Grade colors using CSS variables
+const GRADE_COLORS = {
+  S: 'var(--grade-s)',
+  A: 'var(--grade-a)',
+  B: 'var(--grade-b)',
+  C: 'var(--grade-c)',
+  D: 'var(--grade-d)',
+  F: 'var(--grade-f)',
+} as const;
+
 // Get grade from value
-function getGrade(value: number): { grade: string; color: string } {
-  if (value >= 90) return { grade: 'S', color: '#ffd700' };
-  if (value >= 80) return { grade: 'A', color: '#22c55e' };
-  if (value >= 60) return { grade: 'B', color: '#84cc16' };
-  if (value >= 40) return { grade: 'C', color: '#eab308' };
-  if (value >= 20) return { grade: 'D', color: '#f97316' };
-  return { grade: 'F', color: '#ef4444' };
+function getGrade(value: number): { grade: keyof typeof GRADE_COLORS; color: string } {
+  if (value >= 90) return { grade: 'S', color: GRADE_COLORS.S };
+  if (value >= 80) return { grade: 'A', color: GRADE_COLORS.A };
+  if (value >= 60) return { grade: 'B', color: GRADE_COLORS.B };
+  if (value >= 40) return { grade: 'C', color: GRADE_COLORS.C };
+  if (value >= 20) return { grade: 'D', color: GRADE_COLORS.D };
+  return { grade: 'F', color: GRADE_COLORS.F };
 }
 
 export function StatBar({ label, value, className, compact = false }: StatBarProps) {

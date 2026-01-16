@@ -233,6 +233,7 @@ export interface AnalysisResult {
   npmPackages: NpmPackage[];
   hnStats: { points: number; comments: number; topPost?: string };
   contributions: ContributionStats | null;
+  totalStars?: number;  // Total GitHub stars across all repos
   analyzedAt: string;
 }
 

@@ -10,12 +10,11 @@ import {
 
 interface GlobalRankingProps {
   totalStars: number;
-  username: string;
+  username?: string; // Reserved for future use (e.g., personalized messages)
 }
 
 export const GlobalRanking = memo(function GlobalRanking({
   totalStars,
-  username,
 }: GlobalRankingProps) {
   const percentile = useMemo(() => calculateGlobalPercentile(totalStars), [totalStars]);
   const estimatedRank = useMemo(() => estimateGlobalRank(totalStars), [totalStars]);

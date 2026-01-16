@@ -7,7 +7,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useAction } from 'convex/react';
 import { api } from '../../../../convex/_generated/api';
 import { Button } from '@/components/ui/button';
-import { FIFACard, ContributionGraph, AchievementBadges, TierListComparison, HexagonRadar, SignalBars } from '@/components/cards';
+import { FIFACard, ContributionGraph, AchievementBadges, TierListComparison, HexagonRadar, SignalBars, GlobalRanking } from '@/components/cards';
+import { SceneStellerGallery } from '@/components/cards/SceneStellerGallery';
 import { LeaderboardPanel, DistributionChart, MiniLeaderboard } from '@/components/leaderboard';
 import { LanguageEvolution, NpmPerformance, CareerPhase } from '@/components/career';
 import { StreakStats, CodingPatterns, TrendAnalysis, CodeOwnership } from '@/components/analytics';
@@ -321,11 +322,11 @@ ${shareUrl}`;
               {/* OVERVIEW Tab */}
               <TabPanel tabId="overview" activeTab={activeTab}>
                 {/* Content Grid */}
-                <div className="grid lg:grid-cols-12 gap-8 items-start">
+                <div className="grid lg:grid-cols-12 gap-6 items-start">
 
                   {/* Left: FIFA Card (Fits 5 columns) */}
-                  <div className="lg:col-span-5 flex justify-center lg:justify-end">
-                    <div className="sticky top-8 transform hover:scale-[1.01] transition-transform duration-500 ease-out perspective-1000">
+                  <div className="lg:col-span-5 flex justify-center lg:justify-start">
+                    <div className="sticky top-8 w-full max-w-[500px] transform hover:scale-[1.01] transition-transform duration-500 ease-out perspective-1000">
                       <FIFACard
                         username={result.username}
                         avatarUrl={result.avatarUrl}
@@ -343,8 +344,8 @@ ${shareUrl}`;
 
                   {/* Right: FM-Style Attribute Analysis Panel (Fits 7 columns) */}
                   <div className="lg:col-span-7 h-full">
-                    <div className="bg-bg-secondary/50 backdrop-blur-md rounded-2xl p-8 border border-white/5 h-full flex flex-col">
-                      <div className="flex items-center justify-between mb-8 border-b border-white/5 pb-4">
+                    <div className="bg-bg-secondary/50 backdrop-blur-md rounded-2xl p-6 border border-white/5 h-full flex flex-col">
+                      <div className="flex items-center justify-between mb-6 border-b border-white/5 pb-4">
                         <h3 className="text-sm font-semibold text-text-secondary flex items-center gap-2 uppercase tracking-wider">
                           <span>📊</span> Attribute Analysis
                         </h3>
@@ -353,22 +354,22 @@ ${shareUrl}`;
                         </div>
                       </div>
 
-                      <div className="flex-1 grid md:grid-cols-2 gap-8 items-center">
+                      <div className="flex-1 grid md:grid-cols-2 gap-6 items-center">
                         {/* Radar Chart (Visual) */}
-                        <div className="flex items-center justify-center p-4 relative">
+                        <div className="flex items-center justify-center relative">
                           {/* Subtle background grid/glow */}
                           <div className="absolute inset-0 bg-radial-gradient from-white/5 to-transparent opacity-30 blur-2xl rounded-full" />
                           <HexagonRadar
                             signals={result.signals}
-                            size={380}
+                            size={320}
                             tierColor={result.tier.color}
                             className="relative z-10 drop-shadow-2xl"
                           />
                         </div>
 
                         {/* Detailed Attributes (Data) */}
-                        <div className="bg-bg-tertiary/20 rounded-xl p-6 border border-white/5 h-full flex flex-col justify-center">
-                          <div className="mb-6">
+                        <div className="bg-bg-tertiary/20 rounded-xl p-5 border border-white/5 h-full flex flex-col justify-center">
+                          <div className="mb-5">
                             <h4 className="text-xs font-bold text-text-muted uppercase tracking-widest mb-2">Technical Profile</h4>
                             <div className="h-0.5 w-12 bg-white/10 rounded-full" />
                           </div>
@@ -417,6 +418,14 @@ ${shareUrl}`;
                           hnPoints: result.hnStats.points,
                         }}
                       />
+                    </div>
+
+                    {/* SceneSteller Gallery */}
+                    <div className="p-8 border-t border-white/5">
+                      <h3 className="text-sm font-semibold text-text-secondary flex items-center gap-2 uppercase tracking-wider mb-4">
+                        <span>✨</span> AI Art Gallery
+                      </h3>
+                      <SceneStellerGallery userId={result.username} maxImages={6} />
                     </div>
                   </div>
                 )}
@@ -598,7 +607,7 @@ ${shareUrl}`;
                             OVERALL.RATING
                           </div>
                           <div
-                            className="text-7xl lg:text-8xl font-black tracking-tighter leading-none"
+                            className="text-6xl lg:text-[5rem] font-black tracking-tighter leading-none"
                             style={{
                               color: result.tier.color,
                               textShadow: `0 0 60px ${result.tier.color}40`
@@ -619,6 +628,11 @@ ${shareUrl}`;
                             <span className="text-sm text-text-secondary font-medium">
                               {result.tier.name}
                             </span>
+                            {userRank?.percentile && (
+                              <span className="text-xs text-text-muted font-mono">
+                                Top {Math.round(100 - userRank.percentile)}%
+                              </span>
+                            )}
                           </div>
                         </div>
 
@@ -1091,6 +1105,22 @@ ${shareUrl}`;
                       <div className="text-[10px] font-mono uppercase text-text-muted mt-1">TIER CLASS</div>
                     </div>
                   </div>
+
+                  {/* === GITHUB STAR RANKING === */}
+                  {result.totalStars !== undefined && result.totalStars > 0 && (
+                    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-b from-zinc-900/80 to-black border border-white/[0.06]">
+                      <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-cyan-500/30 to-transparent" />
+                      <div className="p-6">
+                        <div className="flex items-center gap-3 mb-4">
+                          <div className="w-1 h-6 rounded-full bg-cyan-500" />
+                          <h3 className="text-xs font-mono uppercase tracking-[0.15em] text-text-secondary">
+                            GITHUB_STAR_RANKING
+                          </h3>
+                        </div>
+                        <GlobalRanking totalStars={result.totalStars} username={result.username} />
+                      </div>
+                    </div>
+                  )}
 
                 </div>
               </TabPanel>

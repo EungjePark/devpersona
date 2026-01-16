@@ -128,11 +128,27 @@ export function ContributionGraph({ contributions, className = '', compact = fal
             totalCount: '{{count}} contributions in {{year}}',
           }}
           colorScheme="dark"
-          blockSize={14}
-          blockMargin={3}
+          blockSize={16}
+          blockMargin={4}
           fontSize={11}
           showWeekdayLabels
         />
+      </div>
+
+      {/* Explicit Legend */}
+      <div className="flex items-center justify-center gap-4 mt-4 pt-4 border-t border-white/5 max-w-[880px] mx-auto">
+        <span className="text-[10px] text-text-muted font-medium">Less</span>
+        <div className="flex gap-1">
+          {levelColors.map((color, index) => (
+            <div
+              key={index}
+              className="w-4 h-4 rounded-sm"
+              style={{ backgroundColor: color }}
+              title={`Level ${index}: ${index === 0 ? '0' : index === 1 ? '1-3' : index === 2 ? '4-6' : index === 3 ? '7-9' : '10+'} contributions`}
+            />
+          ))}
+        </div>
+        <span className="text-[10px] text-text-muted font-medium">More</span>
       </div>
     </div>
   );
