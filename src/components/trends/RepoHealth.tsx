@@ -58,7 +58,7 @@ export const RepoHealth = memo(function RepoHealth({ health }: RepoHealthProps) 
 
       {/* Visual bar */}
       <div className="h-8 rounded-full overflow-hidden flex">
-        {segments.map((segment, index) => (
+        {segments.map((segment) => (
           <div
             key={segment.label}
             className="h-full transition-all duration-500 hover:opacity-80 relative group"

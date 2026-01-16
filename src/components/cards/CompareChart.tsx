@@ -269,7 +269,8 @@ export function CompareChart({
           const valueA = userA.signals[key];
           const valueB = userB.signals[key];
           const diff = valueA - valueB;
-          const maxValue = Math.max(valueA, valueB);
+          // maxValue reserved for future percentage-based comparison bars
+          void Math.max(valueA, valueB);
 
           return (
             <div key={key} className="p-3 rounded-lg bg-white/[0.02] border border-white/5">

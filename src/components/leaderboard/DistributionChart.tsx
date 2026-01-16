@@ -19,8 +19,8 @@ interface DistributionChartProps {
 }
 
 // Chart dimensions
-const DEFAULT_CHART_WIDTH = 380;
-const WIDE_CHART_WIDTH = 800;
+const DEFAULT_chartWidth = 380;
+const WIDE_chartWidth = 800;
 const CHART_HEIGHT = 200;
 const CHART_PADDING = { top: 35, right: 20, bottom: 45, left: 20 };
 const BAR_GAP = 2;
@@ -33,25 +33,38 @@ export function DistributionChart({
   snapshot,
   variant = 'default',
 }: DistributionChartProps): React.ReactNode {
-  // Support both direct props and snapshot prop
-  const buckets = bucketsProp ?? snapshot?.distribution ?? [];
-  const totalUsers = totalUsersProp ?? snapshot?.totalUsers ?? 0;
+  // Support both direct props and snapshot prop - memoized to prevent dependency changes
+  const buckets = useMemo(
+    () => bucketsProp ?? snapshot?.distribution ?? [],
+    [bucketsProp, snapshot?.distribution]
+  );
+  const totalUsers = useMemo(
+    () => totalUsersProp ?? snapshot?.totalUsers ?? 0,
+    [totalUsersProp, snapshot?.totalUsers]
+  );
 
-  const CHART_WIDTH = variant === 'wide' ? WIDE_CHART_WIDTH : DEFAULT_CHART_WIDTH;
-  const INNER_WIDTH = CHART_WIDTH - CHART_PADDING.left - CHART_PADDING.right;
-  const INNER_HEIGHT = CHART_HEIGHT - CHART_PADDING.top - CHART_PADDING.bottom;
+  // Chart dimensions - derived from variant, memoized for stable references
+  const { chartWidth, innerWidth, innerHeight } = useMemo(() => {
+    const cw = variant === 'wide' ? WIDE_chartWidth : DEFAULT_chartWidth;
+    return {
+      chartWidth: cw,
+      innerWidth: cw - CHART_PADDING.left - CHART_PADDING.right,
+      innerHeight: CHART_HEIGHT - CHART_PADDING.top - CHART_PADDING.bottom,
+    };
+  }, [variant]);
+
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
   // Calculate chart data
   const chartData = useMemo(() => {
     const maxCount = Math.max(...buckets.map((b) => b.count), 1);
-    const barWidth = (INNER_WIDTH - (buckets.length - 1) * BAR_GAP) / buckets.length;
+    const barWidth = (innerWidth - (buckets.length - 1) * BAR_GAP) / buckets.length;
 
     const bars = buckets.map((bucket, i) => {
       const bucketStart = parseInt(bucket.bucket.split("-")[0]);
-      const height = (bucket.count / maxCount) * INNER_HEIGHT;
+      const height = (bucket.count / maxCount) * innerHeight;
       const x = CHART_PADDING.left + i * (barWidth + BAR_GAP);
-      const y = CHART_PADDING.top + INNER_HEIGHT - height;
+      const y = CHART_PADDING.top + innerHeight - height;
 
       // Determine tier color
       let tierKey: 'S' | 'A' | 'B' | 'C' = 'C';
@@ -78,7 +91,7 @@ export function DistributionChart({
     });
 
     // Generate smooth curve points for overlay
-    const curvePoints = bars.map((bar, i) => {
+    const curvePoints = bars.map((bar) => {
       const x = bar.x + bar.width / 2;
       const y = bar.y;
       return { x, y };
@@ -98,11 +111,11 @@ export function DistributionChart({
 
     // Curve fill path
     const curveFillPath = curvePath +
-      ` L ${curvePoints[curvePoints.length - 1].x} ${CHART_PADDING.top + INNER_HEIGHT}` +
-      ` L ${curvePoints[0].x} ${CHART_PADDING.top + INNER_HEIGHT} Z`;
+      ` L ${curvePoints[curvePoints.length - 1].x} ${CHART_PADDING.top + innerHeight}` +
+      ` L ${curvePoints[0].x} ${CHART_PADDING.top + innerHeight} Z`;
 
     return { bars, maxCount, barWidth, curvePath, curveFillPath };
-  }, [buckets, currentRating, compareRating, totalUsers]);
+  }, [buckets, currentRating, compareRating, totalUsers, innerWidth, innerHeight]);
 
   // User tier color
   const userTierColor =
@@ -114,8 +127,8 @@ export function DistributionChart({
           ? TIERS.B.color
           : TIERS.C.color;
 
-  // Compare tier color
-  const compareTierColor = compareRating !== undefined
+  // Compare tier color - reserved for future enhanced comparison view
+  void (compareRating !== undefined
     ? compareRating >= 90
       ? TIERS.S.color
       : compareRating >= 75
@@ -123,12 +136,12 @@ export function DistributionChart({
         : compareRating >= 50
           ? TIERS.B.color
           : TIERS.C.color
-    : '#f97316';
+    : '#f97316');
 
   // Calculate positions
-  const userMarkerX = CHART_PADDING.left + (currentRating / 100) * INNER_WIDTH;
+  const userMarkerX = CHART_PADDING.left + (currentRating / 100) * innerWidth;
   const compareMarkerX = compareRating !== undefined
-    ? CHART_PADDING.left + (compareRating / 100) * INNER_WIDTH
+    ? CHART_PADDING.left + (compareRating / 100) * innerWidth
     : null;
 
   // Calculate percentile
@@ -148,7 +161,7 @@ export function DistributionChart({
   return (
     <div className="relative">
       <svg
-        viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
+        viewBox={`0 0 ${chartWidth} ${CHART_HEIGHT}`}
         className="w-full"
         preserveAspectRatio="xMidYMid meet"
       >
@@ -188,10 +201,10 @@ export function DistributionChart({
         ].map((zone, i) => (
           <rect
             key={i}
-            x={CHART_PADDING.left + (zone.start / 100) * INNER_WIDTH}
+            x={CHART_PADDING.left + (zone.start / 100) * innerWidth}
             y={CHART_PADDING.top}
-            width={((zone.end - zone.start) / 100) * INNER_WIDTH}
-            height={INNER_HEIGHT}
+            width={((zone.end - zone.start) / 100) * innerWidth}
+            height={innerHeight}
             fill={zone.color}
             opacity={zone.opacity}
           />
@@ -223,7 +236,7 @@ export function DistributionChart({
               {isHovered && (
                 <g>
                   <rect
-                    x={Math.min(Math.max(bar.x + bar.width / 2 - 35, CHART_PADDING.left), CHART_WIDTH - CHART_PADDING.right - 70)}
+                    x={Math.min(Math.max(bar.x + bar.width / 2 - 35, CHART_PADDING.left), chartWidth - CHART_PADDING.right - 70)}
                     y={bar.y - 40}
                     width={70}
                     height={32}
@@ -279,14 +292,14 @@ export function DistributionChart({
               x1={compareMarkerX}
               y1={CHART_PADDING.top}
               x2={compareMarkerX}
-              y2={CHART_PADDING.top + INNER_HEIGHT}
+              y2={CHART_PADDING.top + innerHeight}
               stroke="#f97316"
               strokeWidth="1.5"
               strokeDasharray="4 3"
             />
             <circle
               cx={compareMarkerX}
-              cy={CHART_PADDING.top + INNER_HEIGHT}
+              cy={CHART_PADDING.top + innerHeight}
               r="4"
               fill="#09090b"
               stroke="#f97316"
@@ -311,14 +324,14 @@ export function DistributionChart({
             x1={userMarkerX}
             y1={CHART_PADDING.top}
             x2={userMarkerX}
-            y2={CHART_PADDING.top + INNER_HEIGHT}
+            y2={CHART_PADDING.top + innerHeight}
             stroke={userTierColor}
             strokeWidth="2"
             strokeDasharray="2 2" // Dashed line for modern feel
           />
           <circle
             cx={userMarkerX}
-            cy={CHART_PADDING.top + INNER_HEIGHT}
+            cy={CHART_PADDING.top + innerHeight}
             r="4"
             fill={userTierColor}
           />
@@ -345,9 +358,9 @@ export function DistributionChart({
         {/* X-axis */}
         <line
           x1={CHART_PADDING.left}
-          y1={CHART_PADDING.top + INNER_HEIGHT}
-          x2={CHART_PADDING.left + INNER_WIDTH}
-          y2={CHART_PADDING.top + INNER_HEIGHT}
+          y1={CHART_PADDING.top + innerHeight}
+          x2={CHART_PADDING.left + innerWidth}
+          y2={CHART_PADDING.top + innerHeight}
           stroke="rgba(255,255,255,0.1)"
         />
 
@@ -355,7 +368,7 @@ export function DistributionChart({
         {[0, 50, 100].map((val) => (
           <text
             key={val}
-            x={CHART_PADDING.left + (val / 100) * INNER_WIDTH}
+            x={CHART_PADDING.left + (val / 100) * innerWidth}
             y={CHART_HEIGHT - 22}
             fill="rgba(255,255,255,0.4)"
             fontSize="9"
@@ -375,7 +388,7 @@ export function DistributionChart({
           ].map((t) => (
             <text
               key={t.label}
-              x={CHART_PADDING.left + t.x * INNER_WIDTH}
+              x={CHART_PADDING.left + t.x * innerWidth}
               y={CHART_HEIGHT - 8}
               fill={t.color}
               fontSize="10"

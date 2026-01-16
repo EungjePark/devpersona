@@ -1,14 +1,27 @@
 'use client';
 
+import { useState, useMemo } from 'react';
+import {
+  Radar,
+  RadarChart,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
+  ResponsiveContainer,
+  Tooltip,
+} from 'recharts';
 import { SIGNAL_LABELS, SIGNAL_ORDER, STAT_GRADES, type SignalScores, type StatGrade } from '@/lib/types';
 import { GRADE_DESCRIPTIONS } from '@/lib/format';
 import { cn } from '@/lib/utils';
+import { CHART_THEME, tooltipStyle, CHART_ANIMATION } from '@/lib/chart-config';
 
 interface SignalBarsProps {
   signals: SignalScores;
   className?: string;
   showGrade?: boolean;
   compact?: boolean;
+  tierColor?: string;
+  allowToggle?: boolean;
 }
 
 // Grade colors using CSS variables for consistency
@@ -44,14 +57,99 @@ function getGrade(value: number): { grade: StatGrade; color: string; colorHex: s
   return { grade: 'F', color: GRADE_COLORS.F, colorHex: GRADE_COLORS_HEX.F };
 }
 
-export function SignalBars({
-  signals,
-  className = '',
-  showGrade = true,
-  compact = false,
-}: SignalBarsProps) {
+// Radar chart tooltip
+interface RadarTooltipPayload {
+  value: number;
+  payload: { signal: string; value: number; fullMark: number };
+}
+
+interface RadarTooltipProps {
+  active?: boolean;
+  payload?: RadarTooltipPayload[];
+}
+
+function RadarTooltip({ active, payload }: RadarTooltipProps) {
+  if (!active || !payload?.length) return null;
+
+  const data = payload[0].payload;
+  const { grade, colorHex } = getGrade(data.value);
+
   return (
-    <div className={cn('space-y-3', className)}>
+    <div style={tooltipStyle.contentStyle}>
+      <p style={tooltipStyle.labelStyle}>{data.signal}</p>
+      <div className="flex items-center gap-2">
+        <span
+          className="text-xs font-bold px-1.5 py-0.5 rounded"
+          style={{ backgroundColor: `${colorHex}30`, color: colorHex }}
+        >
+          {grade}
+        </span>
+        <span style={tooltipStyle.itemStyle}>{data.value}</span>
+      </div>
+    </div>
+  );
+}
+
+// Radar Chart View
+function SignalRadarChart({
+  signals,
+  tierColor = '#6366f1',
+}: {
+  signals: SignalScores;
+  tierColor?: string;
+}) {
+  const radarData = useMemo(() =>
+    SIGNAL_ORDER.map((key) => ({
+      signal: SIGNAL_LABELS[key].name,
+      value: signals[key],
+      fullMark: 100,
+    })),
+    [signals]
+  );
+
+  return (
+    <div className="h-64">
+      <ResponsiveContainer width="100%" height="100%">
+        <RadarChart data={radarData} cx="50%" cy="50%" outerRadius="80%">
+          <PolarGrid stroke={CHART_THEME.grid} />
+          <PolarAngleAxis
+            dataKey="signal"
+            tick={{ fill: CHART_THEME.axisLabel, fontSize: 11, fontWeight: 500 }}
+          />
+          <PolarRadiusAxis
+            angle={30}
+            domain={[0, 100]}
+            tick={{ fill: CHART_THEME.axisLabel, fontSize: 9 }}
+            axisLine={false}
+          />
+          <Tooltip content={<RadarTooltip />} />
+          <Radar
+            name="Signals"
+            dataKey="value"
+            stroke={tierColor}
+            fill={tierColor}
+            fillOpacity={0.25}
+            strokeWidth={2}
+            animationDuration={CHART_ANIMATION.duration}
+          />
+        </RadarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+// Bar List View (original)
+function SignalBarList({
+  signals,
+  showGrade,
+  compact,
+}: {
+  signals: SignalScores;
+  showGrade: boolean;
+  compact: boolean;
+}) {
+  return (
+    <div className="space-y-3">
       {SIGNAL_ORDER.map((key) => {
         const label = SIGNAL_LABELS[key];
         const value = signals[key];
@@ -123,6 +221,56 @@ export function SignalBars({
   );
 }
 
+export function SignalBars({
+  signals,
+  className = '',
+  showGrade = true,
+  compact = false,
+  tierColor = '#6366f1',
+  allowToggle = false,
+}: SignalBarsProps) {
+  const [viewMode, setViewMode] = useState<'bars' | 'radar'>('bars');
+
+  return (
+    <div className={cn('space-y-3', className)}>
+      {/* Toggle buttons */}
+      {allowToggle && (
+        <div className="flex justify-end gap-1">
+          <button
+            onClick={() => setViewMode('bars')}
+            className={cn(
+              'px-2.5 py-1 rounded-md text-xs font-medium transition-all',
+              viewMode === 'bars'
+                ? 'bg-white/10 text-white'
+                : 'text-text-muted hover:text-white hover:bg-white/5'
+            )}
+          >
+            Bars
+          </button>
+          <button
+            onClick={() => setViewMode('radar')}
+            className={cn(
+              'px-2.5 py-1 rounded-md text-xs font-medium transition-all',
+              viewMode === 'radar'
+                ? 'bg-white/10 text-white'
+                : 'text-text-muted hover:text-white hover:bg-white/5'
+            )}
+          >
+            Radar
+          </button>
+        </div>
+      )}
+
+      {/* Content */}
+      {viewMode === 'radar' && allowToggle ? (
+        <SignalRadarChart signals={signals} tierColor={tierColor} />
+      ) : (
+        <SignalBarList signals={signals} showGrade={showGrade} compact={compact} />
+      )}
+    </div>
+  );
+}
+
 // Compact 2-column grid version
 export function SignalBarsGrid({
   signals,
@@ -183,3 +331,6 @@ export function SignalBarsGrid({
     </div>
   );
 }
+
+// Standalone RadarChart export for use elsewhere
+export { SignalRadarChart };

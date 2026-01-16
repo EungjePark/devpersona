@@ -859,7 +859,7 @@ export function calculateAchievements(
 
   // Secret/Easter Egg (based on contribution patterns)
   const dayOfWeekCounts = [0, 0, 0, 0, 0, 0, 0]; // Sun-Sat
-  const hourCounts: number[] = new Array(24).fill(0);
+  // hourCounts reserved for future time-of-day achievement patterns
   let weekdayTotal = 0;
   let weekendTotal = 0;
 
@@ -1003,7 +1003,8 @@ export function calculatePotential(
   contributions: ContributionStats,
   overallRating: number
 ): PotentialRating {
-  const { averagePerDay, currentStreak, longestStreak, totalContributions, calendar } = contributions;
+  const { averagePerDay, currentStreak, longestStreak, totalContributions: _totalContributions, calendar } = contributions;
+  void _totalContributions; // Reserved for contribution-based potential adjustment
 
   // Calculate monthly contribution trend
   const weeks = calendar.weeks;

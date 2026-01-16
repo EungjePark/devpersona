@@ -8,7 +8,7 @@ import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { TIERS, TIER_DESIGN_TOKENS, type TierLevel } from "@/lib/types";
+import { TIERS, type TierLevel } from "@/lib/types";
 import type { TopUser } from "@/lib/leaderboard-types";
 
 interface LeaderboardPanelProps {

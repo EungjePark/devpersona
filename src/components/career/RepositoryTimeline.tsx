@@ -1,7 +1,7 @@
 'use client';
 
 import { memo, useMemo } from 'react';
-import { TIERS, type TierLevel } from '@/lib/types';
+// TIERS and TierLevel reserved for future tier-based repo categorization
 
 interface RepoTimelineData {
   name: string;
@@ -75,7 +75,7 @@ export const RepositoryTimeline = memo(function RepositoryTimeline({
           }}
         />
         {/* Repo markers */}
-        {sortedRepos.map((repo, index) => {
+        {sortedRepos.map((repo) => {
           const repoYear = new Date(repo.createdAt).getFullYear();
           const startYear = yearsRange[0] || new Date().getFullYear();
           const endYear = yearsRange[yearsRange.length - 1] || new Date().getFullYear();

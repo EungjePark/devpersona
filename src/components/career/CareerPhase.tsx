@@ -33,12 +33,14 @@ const CAREER_PHASES: PhaseInfo[] = [
 
 export const CareerPhase = memo(function CareerPhase({
   overallRating,
-  tier,
+  tier: _tier, // Reserved for future phase-tier correlation
   tierColor,
   accountAge,
   totalRepos,
-  totalContributions,
+  totalContributions: _totalContributions, // Reserved for activity-based phase calculation
 }: CareerPhaseProps) {
+  void _tier;
+  void _totalContributions;
   // Determine current career phase
   const currentPhase = useMemo(() => {
     for (let i = CAREER_PHASES.length - 1; i >= 0; i--) {
@@ -83,7 +85,7 @@ export const CareerPhase = memo(function CareerPhase({
       {/* Career progression bar */}
       <div className="space-y-3">
         <div className="flex justify-between items-center">
-          {CAREER_PHASES.map((phase, index) => {
+          {CAREER_PHASES.map((phase) => {
             const isCurrentOrPast = overallRating >= phase.minRating;
             const isCurrent = phase.level === currentPhase.level;
 

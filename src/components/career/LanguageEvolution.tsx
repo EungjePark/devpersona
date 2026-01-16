@@ -60,7 +60,7 @@ export const LanguageEvolution = memo(function LanguageEvolution({
       {/* Stacked bar chart */}
       <div className="space-y-2">
         <div className="h-8 flex rounded-xl overflow-hidden">
-          {topLanguages.map((lang, index) => {
+          {topLanguages.map((lang) => {
             const color = LANGUAGE_COLORS[lang.name] || tierColor;
             const width = (lang.percentage / totalPercentage) * 100;
 
