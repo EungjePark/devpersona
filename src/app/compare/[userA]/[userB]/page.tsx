@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, use, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { CompareChart } from '@/components/cards';
@@ -239,6 +240,7 @@ function VerdictCard({ resultA, resultB }: { resultA: AnalysisResult; resultB: A
 
 export default function ComparePage({ params }: ComparePageProps) {
   const { userA, userB } = use(params);
+  const router = useRouter();
   const [resultA, setResultA] = useState<AnalysisResult | null>(null);
   const [resultB, setResultB] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -282,13 +284,13 @@ export default function ComparePage({ params }: ComparePageProps) {
 
       {/* Header */}
       <div className="max-w-6xl mx-auto pt-8 pb-4 px-4 relative z-10">
-        <Link
-          href="/"
+        <button
+          onClick={() => router.back()}
           className="inline-flex items-center gap-2 text-text-muted hover:text-white transition-colors group px-4 py-2 rounded-full hover:bg-white/5"
         >
           <span className="transform group-hover:-translate-x-1 transition-transform">←</span>
-          <span className="font-medium">Back to Home</span>
-        </Link>
+          <span className="font-medium">Back</span>
+        </button>
       </div>
 
       {/* Content */}
