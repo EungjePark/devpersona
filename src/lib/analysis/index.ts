@@ -26,7 +26,7 @@ export async function analyzeUser(
   username: string,
   options: AnalyzeOptions = {}
 ): Promise<AnalysisResult> {
-  // Fetch GitHub data first (repos needed for community metrics)
+  // Fetch all data in PARALLEL for maximum performance
   const [githubData, npmPackages] = await Promise.all([
     fetchAllGitHubData(username, { token: options.githubToken }),
     fetchNpmData(username).catch(() => []),
@@ -34,15 +34,23 @@ export async function analyzeUser(
 
   const { user, repos, commits, contributions } = githubData;
 
-  // Community metrics can now run (uses repos data)
-  const communityMetrics = await fetchCommunityMetrics(username, repos, { token: options.githubToken }).catch(
-    (): CommunityMetrics => ({
-      externalPRs: 0,
-      prsReceived: 0,
-      issuesReceived: 0,
-      uniqueContributors: 0,
-    })
-  );
+  // Run community metrics with a timeout to prevent blocking (10s max)
+  const communityMetrics = await Promise.race([
+    fetchCommunityMetrics(username, repos, { token: options.githubToken }),
+    new Promise<CommunityMetrics>((resolve) =>
+      setTimeout(() => resolve({
+        externalPRs: 0,
+        prsReceived: 0,
+        issuesReceived: 0,
+        uniqueContributors: 0,
+      }), 10000)
+    ),
+  ]).catch((): CommunityMetrics => ({
+    externalPRs: 0,
+    prsReceived: 0,
+    issuesReceived: 0,
+    uniqueContributors: 0,
+  }));
 
   // Calculate signals
   const signals = calculateAllSignals(

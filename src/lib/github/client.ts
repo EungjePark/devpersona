@@ -102,42 +102,43 @@ export async function fetchRepos(
 
 /**
  * Fetch commits from multiple repos (sampling strategy)
+ * Parallelized for performance
  */
 export async function fetchCommits(
   username: string,
   repos: GitHubRepo[],
   options: GitHubClientOptions = {},
-  commitsPerRepo = 30
+  commitsPerRepo = 20
 ): Promise<GitHubCommit[]> {
   const apiBase = getApiBase(options.token);
-  // Sample from top 10 repos by recent activity
+  // Sample from top 5 repos by recent activity (reduced for speed)
   const topRepos = repos
     .filter(r => !r.archived)
-    .slice(0, 10);
+    .slice(0, 5);
 
-  const allCommits: GitHubCommit[] = [];
+  // Fetch commits from all repos in PARALLEL
+  const results = await Promise.all(
+    topRepos.map(async (repo) => {
+      try {
+        const response = await fetch(
+          `${apiBase}/repos/${repo.full_name}/commits?author=${username}&per_page=${commitsPerRepo}`,
+          {
+            headers: getHeaders(options.token),
+            next: { revalidate: 3600 },
+          }
+        );
 
-  for (const repo of topRepos) {
-    try {
-      const response = await fetch(
-        `${apiBase}/repos/${repo.full_name}/commits?author=${username}&per_page=${commitsPerRepo}`,
-        {
-          headers: getHeaders(options.token),
-          next: { revalidate: 3600 },
+        if (response.ok) {
+          return (await response.json()) as GitHubCommit[];
         }
-      );
-
-      if (response.ok) {
-        const commits: GitHubCommit[] = await response.json();
-        allCommits.push(...commits);
+        return [];
+      } catch {
+        return [];
       }
-    } catch {
-      // Skip failed repos
-      continue;
-    }
-  }
+    })
+  );
 
-  return allCommits;
+  return results.flat();
 }
 
 /**
@@ -285,23 +286,23 @@ export async function fetchCommunityMetrics(
 ): Promise<CommunityMetrics> {
   const apiBase = getApiBase(options.token);
 
-  // Sample top 5 repos by stars (reduced for performance)
+  // Sample top 3 repos by stars (reduced for performance)
   const topRepos = repos
     .filter(r => !r.fork && !r.archived)
     .sort((a, b) => b.stargazers_count - a.stargazers_count)
-    .slice(0, 5);
+    .slice(0, 3);
 
   // Fetch PRs and issues in PARALLEL for all repos (skip contributors - too slow)
   const repoMetrics = await Promise.all(
     topRepos.map(async (repo) => {
       try {
-        // Parallel fetch PRs and issues for this repo
+        // Parallel fetch PRs and issues for this repo (reduced per_page for speed)
         const [prsResponse, issuesResponse] = await Promise.all([
-          fetch(`${apiBase}/repos/${repo.full_name}/pulls?state=all&per_page=50`, {
+          fetch(`${apiBase}/repos/${repo.full_name}/pulls?state=all&per_page=30`, {
             headers: getHeaders(options.token),
             next: { revalidate: 3600 },
           }),
-          fetch(`${apiBase}/repos/${repo.full_name}/issues?state=all&per_page=50`, {
+          fetch(`${apiBase}/repos/${repo.full_name}/issues?state=all&per_page=30`, {
             headers: getHeaders(options.token),
             next: { revalidate: 3600 },
           }),
@@ -335,22 +336,26 @@ export async function fetchCommunityMetrics(
   // Skip contributors count for performance - estimate from stars instead
   const contributorSet = new Set<string>();
 
-  // Fetch external PRs (user's PRs to other repos) via search API
+  // Fetch external PRs (user's PRs to other repos) via search API with timeout
   let externalPRs = 0;
   try {
+    const searchController = new AbortController();
+    const searchTimeout = setTimeout(() => searchController.abort(), 5000);
     const searchResponse = await fetch(
-      `${apiBase}/search/issues?q=author:${username}+type:pr+-user:${username}&per_page=100`,
+      `${apiBase}/search/issues?q=author:${username}+type:pr+-user:${username}&per_page=10`,
       {
         headers: getHeaders(options.token),
         next: { revalidate: 3600 },
+        signal: searchController.signal,
       }
     );
+    clearTimeout(searchTimeout);
     if (searchResponse.ok) {
       const searchResult: { total_count: number } = await searchResponse.json();
       externalPRs = searchResult.total_count;
     }
   } catch {
-    // Search API may fail, continue with 0
+    // Search API may fail or timeout, continue with 0
   }
 
   return {
