@@ -244,53 +244,49 @@ export default function AnalyzeClient({ username }: AnalyzeClientProps) {
     }
   }, [username, saveAnalysis, refreshLeaderboard]);
 
-  // Use cached data if available and recent (< 24 hours)
+  // Use cached data if available (7 day cache window for performance)
+  // Always show cached data immediately for fast UX
   useEffect(() => {
     if (cachedAnalysis && !result) {
-      const ageMs = Date.now() - cachedAnalysis.analyzedAt;
-      const isRecent = ageMs < 24 * 60 * 60 * 1000; // 24 hours
+      // Build result from cached data immediately
+      const tier = cachedAnalysis.tier as TierLevel;
+      const tierInfo = TIERS[tier];
+      const archetypeId = cachedAnalysis.archetypeId as ArchetypeId;
+      const archetype = ARCHETYPES[archetypeId] || ARCHETYPES.maintainer;
 
-      if (isRecent) {
-        // Build result from cached data
-        const tier = cachedAnalysis.tier as TierLevel;
-        const tierInfo = TIERS[tier];
-        const archetypeId = cachedAnalysis.archetypeId as ArchetypeId;
-        const archetype = ARCHETYPES[archetypeId] || ARCHETYPES.maintainer;
-
-        setResult({
-          username: cachedAnalysis.username,
-          avatarUrl: cachedAnalysis.avatarUrl,
-          name: cachedAnalysis.name ?? null,
-          bio: null,
-          followers: cachedAnalysis.followers ?? 0,
-          totalStars: cachedAnalysis.totalStars ?? 0,
-          signals: {
-            grit: cachedAnalysis.grit,
-            focus: cachedAnalysis.focus,
-            craft: cachedAnalysis.craft,
-            impact: cachedAnalysis.impact,
-            voice: cachedAnalysis.voice,
-            reach: cachedAnalysis.reach,
-          },
-          overallRating: cachedAnalysis.overallRating,
-          tier: tierInfo,
-          archetype,
-          pattern: { type: 'balanced', name: 'Balanced', emoji: '⚖️', description: 'A balanced coding schedule' },
-          languages: [],
-          repos: [],
-          npmPackages: [],
-          contributions: null,
-          communityMetrics: undefined,
-          analyzedAt: new Date(cachedAnalysis.analyzedAt).toISOString(),
-        });
-        setRoast(getRandomRoast(archetype));
-        setIsLoading(false);
-        return;
-      }
+      setResult({
+        username: cachedAnalysis.username,
+        avatarUrl: cachedAnalysis.avatarUrl,
+        name: cachedAnalysis.name ?? null,
+        bio: null,
+        followers: cachedAnalysis.followers ?? 0,
+        totalStars: cachedAnalysis.totalStars ?? 0,
+        signals: {
+          grit: cachedAnalysis.grit,
+          focus: cachedAnalysis.focus,
+          craft: cachedAnalysis.craft,
+          impact: cachedAnalysis.impact,
+          voice: cachedAnalysis.voice,
+          reach: cachedAnalysis.reach,
+        },
+        overallRating: cachedAnalysis.overallRating,
+        tier: tierInfo,
+        archetype,
+        pattern: { type: 'balanced', name: 'Balanced', emoji: '⚖️', description: 'A balanced coding schedule' },
+        languages: [],
+        repos: [],
+        npmPackages: [],
+        contributions: null,
+        communityMetrics: undefined,
+        analyzedAt: new Date(cachedAnalysis.analyzedAt).toISOString(),
+      });
+      setRoast(getRandomRoast(archetype));
+      setIsLoading(false);
     }
   }, [cachedAnalysis, result]);
 
-  // Only run fresh analysis if no cached data or cache is stale
+  // Only run fresh analysis if no cached data exists
+  // (removed stale check - we always use cached data if available)
   useEffect(() => {
     // Wait for Convex query to resolve
     if (cachedAnalysis === undefined) return; // Still loading
@@ -298,14 +294,8 @@ export default function AnalyzeClient({ username }: AnalyzeClientProps) {
     if (cachedAnalysis === null) {
       // No cached data - run fresh analysis
       runAnalysis();
-    } else {
-      const ageMs = Date.now() - cachedAnalysis.analyzedAt;
-      const isStale = ageMs >= 24 * 60 * 60 * 1000; // 24 hours
-
-      if (isStale) {
-        runAnalysis();
-      }
     }
+    // If cachedAnalysis exists, we already displayed it above - no need to re-analyze
   }, [cachedAnalysis, runAnalysis]);
 
   const handleReroll = useCallback(() => {
