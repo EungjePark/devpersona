@@ -62,7 +62,7 @@ export async function GET(
     const badge: BadgeResponse = {
       schemaVersion: 1,
       label: `${analysis.tier} Tier • OVR ${analysis.overallRating}`,
-      message: analysis.archetypeId?.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || 'Developer',
+      message: analysis.archetypeId?.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || 'Developer',
       color: tierColor,
       namedLogo: 'github',
       logoColor: 'white',
