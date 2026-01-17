@@ -290,18 +290,49 @@ export default function AnalyzeClient({ username }: AnalyzeClientProps) {
     }
   }, [cachedAnalysis, result]);
 
-  // Only run fresh analysis if no cached data exists
-  // (removed stale check - we always use cached data if available)
+  // Always run fresh analysis to get complete data (languages, contributions, etc.)
+  // Cached data provides instant display, fresh analysis provides full details
   useEffect(() => {
     // Wait for Convex query to resolve
     if (cachedAnalysis === undefined) return; // Still loading
 
     if (cachedAnalysis === null) {
-      // No cached data - run fresh analysis
+      // No cached data - run fresh analysis with loading state
       runAnalysis();
+    } else {
+      // Cached data exists - run background refresh to get full details
+      // Don't show loading state since we already have cached data displayed
+      const refreshInBackground = async () => {
+        try {
+          const response = await fetch(`/api/analyze/${encodeURIComponent(username)}`);
+          if (!response.ok) return; // Silently fail background refresh
+          const data = await response.json();
+          setResult(data);
+          setRoast(getRandomRoast(data.archetype));
+
+          // Update Convex with fresh data
+          saveAnalysis({
+            username: data.username,
+            avatarUrl: data.avatarUrl,
+            name: data.name ?? undefined,
+            grit: data.signals.grit,
+            focus: data.signals.focus,
+            craft: data.signals.craft,
+            impact: data.signals.impact,
+            voice: data.signals.voice,
+            reach: data.signals.reach,
+            overallRating: data.overallRating,
+            tier: data.tier.level,
+            archetypeId: data.archetype.id,
+            analyzedAt: Date.now(),
+          }).catch(console.error);
+        } catch {
+          // Silently fail - we still have cached data displayed
+        }
+      };
+      refreshInBackground();
     }
-    // If cachedAnalysis exists, we already displayed it above - no need to re-analyze
-  }, [cachedAnalysis, runAnalysis]);
+  }, [cachedAnalysis, runAnalysis, username, saveAnalysis]);
 
   const handleReroll = useCallback(() => {
     if (result) {
