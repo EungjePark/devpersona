@@ -4,31 +4,30 @@
 import type { GitHubUser, GitHubRepo, GitHubCommit, ContributionCalendar, ContributionStats, CommunityMetrics } from '../types';
 
 const GITHUB_API = 'https://api.github.com';
-const GITHUB_PROXY = '/api/github';
 
 interface GitHubClientOptions {
   token?: string; // User's OAuth token (BYOT)
 }
 
 /**
- * Get the appropriate API base URL
- * - With token: Direct GitHub API (BYOT)
- * - Without token: Server-side proxy with GITHUB_TOKEN
+ * Get the effective token (user's OAuth token or server-side GITHUB_TOKEN)
+ * In Edge runtime, we MUST use direct API with a token (no relative URLs allowed)
  */
-function getApiBase(token?: string): string {
-  return token ? GITHUB_API : GITHUB_PROXY;
+function getEffectiveToken(userToken?: string): string | undefined {
+  return userToken || process.env.GITHUB_TOKEN;
 }
 
 /**
  * Create headers for GitHub API requests
+ * Always uses the effective token for authorization
  */
-function getHeaders(token?: string): HeadersInit {
+function getHeaders(userToken?: string): HeadersInit {
+  const token = getEffectiveToken(userToken);
   const headers: HeadersInit = {
     Accept: 'application/vnd.github.v3+json',
     'User-Agent': 'DevPersona/1.0',
   };
 
-  // Only add auth header for direct API calls (BYOT)
   if (token) {
     headers.Authorization = `Bearer ${token}`;
   }
@@ -38,13 +37,13 @@ function getHeaders(token?: string): HeadersInit {
 
 /**
  * Fetch user profile
+ * Always uses direct GitHub API (required for Edge runtime)
  */
 export async function fetchUser(
   username: string,
   options: GitHubClientOptions = {}
 ): Promise<GitHubUser> {
-  const apiBase = getApiBase(options.token);
-  const response = await fetch(`${apiBase}/users/${username}`, {
+  const response = await fetch(`${GITHUB_API}/users/${username}`, {
     headers: getHeaders(options.token),
     next: { revalidate: 3600 }, // Cache for 1 hour
   });
@@ -64,20 +63,20 @@ export async function fetchUser(
 
 /**
  * Fetch user's repositories (paginated, sorted by stars)
+ * Always uses direct GitHub API (required for Edge runtime)
  */
 export async function fetchRepos(
   username: string,
   options: GitHubClientOptions = {},
   limit = 100
 ): Promise<GitHubRepo[]> {
-  const apiBase = getApiBase(options.token);
   const perPage = Math.min(limit, 100);
   const pages = Math.ceil(limit / perPage);
   const repos: GitHubRepo[] = [];
 
   for (let page = 1; page <= pages && repos.length < limit; page++) {
     const response = await fetch(
-      `${apiBase}/users/${username}/repos?per_page=${perPage}&page=${page}&sort=pushed&direction=desc`,
+      `${GITHUB_API}/users/${username}/repos?per_page=${perPage}&page=${page}&sort=pushed&direction=desc`,
       {
         headers: getHeaders(options.token),
         next: { revalidate: 3600 },
@@ -102,7 +101,7 @@ export async function fetchRepos(
 
 /**
  * Fetch commits from multiple repos (sampling strategy)
- * Parallelized for performance
+ * Parallelized for performance, uses direct GitHub API
  */
 export async function fetchCommits(
   username: string,
@@ -110,7 +109,6 @@ export async function fetchCommits(
   options: GitHubClientOptions = {},
   commitsPerRepo = 20
 ): Promise<GitHubCommit[]> {
-  const apiBase = getApiBase(options.token);
   // Sample from top 5 repos by recent activity (reduced for speed)
   const topRepos = repos
     .filter(r => !r.archived)
@@ -121,7 +119,7 @@ export async function fetchCommits(
     topRepos.map(async (repo) => {
       try {
         const response = await fetch(
-          `${apiBase}/repos/${repo.full_name}/commits?author=${username}&per_page=${commitsPerRepo}`,
+          `${GITHUB_API}/repos/${repo.full_name}/commits?author=${username}&per_page=${commitsPerRepo}`,
           {
             headers: getHeaders(options.token),
             next: { revalidate: 3600 },
@@ -149,8 +147,7 @@ export async function checkRateLimit(options: GitHubClientOptions = {}): Promise
   limit: number;
   reset: Date;
 }> {
-  const apiBase = getApiBase(options.token);
-  const response = await fetch(`${apiBase}/rate_limit`, {
+  const response = await fetch(`${GITHUB_API}/rate_limit`, {
     headers: getHeaders(options.token),
   });
 
@@ -196,34 +193,22 @@ export async function fetchContributions(
       }
     `;
 
-    // Use direct GitHub GraphQL API with token (for server-side/Edge runtime)
-    // or use GITHUB_TOKEN from env if available
-    const token = options.token || process.env.GITHUB_TOKEN;
-
-    let response: Response;
-    if (token) {
-      // Direct GitHub API call
-      response = await fetch('https://api.github.com/graphql', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-          'User-Agent': 'DevPersona/1.0',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ query, variables: { username } }),
-      });
-    } else if (typeof window !== 'undefined') {
-      // Client-side: use proxy
-      response = await fetch('/api/github/graphql', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query, variables: { username } }),
-      });
-    } else {
-      // No token and not in browser - cannot fetch
-      return null;
+    // Always use direct GitHub GraphQL API with effective token
+    const token = getEffectiveToken(options.token);
+    if (!token) {
+      return null; // No token available
     }
+
+    const response = await fetch('https://api.github.com/graphql', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        'User-Agent': 'DevPersona/1.0',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ query, variables: { username } }),
+    });
 
     if (!response.ok) return null;
 
@@ -284,8 +269,6 @@ export async function fetchCommunityMetrics(
   repos: GitHubRepo[],
   options: GitHubClientOptions = {}
 ): Promise<CommunityMetrics> {
-  const apiBase = getApiBase(options.token);
-
   // Sample top 3 repos by stars (reduced for performance)
   const topRepos = repos
     .filter(r => !r.fork && !r.archived)
@@ -298,11 +281,11 @@ export async function fetchCommunityMetrics(
       try {
         // Parallel fetch PRs and issues for this repo (reduced per_page for speed)
         const [prsResponse, issuesResponse] = await Promise.all([
-          fetch(`${apiBase}/repos/${repo.full_name}/pulls?state=all&per_page=30`, {
+          fetch(`${GITHUB_API}/repos/${repo.full_name}/pulls?state=all&per_page=30`, {
             headers: getHeaders(options.token),
             next: { revalidate: 3600 },
           }),
-          fetch(`${apiBase}/repos/${repo.full_name}/issues?state=all&per_page=30`, {
+          fetch(`${GITHUB_API}/repos/${repo.full_name}/issues?state=all&per_page=30`, {
             headers: getHeaders(options.token),
             next: { revalidate: 3600 },
           }),
@@ -342,7 +325,7 @@ export async function fetchCommunityMetrics(
     const searchController = new AbortController();
     const searchTimeout = setTimeout(() => searchController.abort(), 5000);
     const searchResponse = await fetch(
-      `${apiBase}/search/issues?q=author:${username}+type:pr+-user:${username}&per_page=10`,
+      `${GITHUB_API}/search/issues?q=author:${username}+type:pr+-user:${username}&per_page=10`,
       {
         headers: getHeaders(options.token),
         next: { revalidate: 3600 },
