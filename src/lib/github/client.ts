@@ -168,9 +168,12 @@ export async function checkRateLimit(options: GitHubClientOptions = {}): Promise
 
 /**
  * Fetch contribution calendar via GraphQL (grass)
+ * Uses direct GitHub API when token is available (server-side)
+ * Falls back to proxy for client-side usage
  */
 export async function fetchContributions(
-  username: string
+  username: string,
+  options: GitHubClientOptions = {}
 ): Promise<ContributionStats | null> {
   try {
     const query = `
@@ -192,11 +195,34 @@ export async function fetchContributions(
       }
     `;
 
-    const response = await fetch('/api/github/graphql', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query, variables: { username } }),
-    });
+    // Use direct GitHub GraphQL API with token (for server-side/Edge runtime)
+    // or use GITHUB_TOKEN from env if available
+    const token = options.token || process.env.GITHUB_TOKEN;
+
+    let response: Response;
+    if (token) {
+      // Direct GitHub API call
+      response = await fetch('https://api.github.com/graphql', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          'User-Agent': 'DevPersona/1.0',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ query, variables: { username } }),
+      });
+    } else if (typeof window !== 'undefined') {
+      // Client-side: use proxy
+      response = await fetch('/api/github/graphql', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query, variables: { username } }),
+      });
+    } else {
+      // No token and not in browser - cannot fetch
+      return null;
+    }
 
     if (!response.ok) return null;
 
@@ -351,7 +377,7 @@ export async function fetchAllGitHubData(
   const [user, repos, contributions] = await Promise.all([
     fetchUser(username, options),
     fetchRepos(username, options, 100),
-    fetchContributions(username),
+    fetchContributions(username, options),
   ]);
 
   // Fetch commits from repos
