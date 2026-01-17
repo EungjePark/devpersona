@@ -33,15 +33,13 @@ export async function searchPackagesByAuthor(username: string): Promise<string[]
     );
 
     if (!response.ok) {
-      console.warn(`npm search failed: ${response.status}`);
       return [];
     }
 
     const data: NpmSearchResult = await response.json();
 
     return data.objects.map(obj => obj.package.name);
-  } catch (error) {
-    console.warn('npm search error:', error);
+  } catch {
     return [];
   }
 }

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo, type ReactNode } from "react";
 import Image from "next/image";
-import { Sparkles, Users, GitFork, Star } from "lucide-react";
+import { Sparkles, Users, Star } from "lucide-react";
 import {
   fetchSceneStellerGallery,
   getSceneStellerShareUrl,

@@ -7,7 +7,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useAction } from 'convex/react';
 import { api } from '../../../../convex/_generated/api';
 import { Button } from '@/components/ui/button';
-import { FIFACard, ContributionGraph, AchievementBadges, TierListComparison, HexagonRadar, SignalBars, SignalBarsGrid, GlobalRanking, SceneStellerAvatar } from '@/components/cards';
+import { ContributionGraph, AchievementBadges, TierListComparison, HexagonRadar, SignalBars, GlobalRanking, SceneStellerAvatar } from '@/components/cards';
 import { ScoreBreakdownModal } from '@/components/cards/ScoreBreakdownModal';
 import { BadgeShowcase } from '@/components/cards/BadgeShowcase';
 import { LeaderboardPanel, DistributionChart, MiniLeaderboard } from '@/components/leaderboard';

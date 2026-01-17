@@ -26,7 +26,7 @@ export async function analyzeUser(
   username: string,
   options: AnalyzeOptions = {}
 ): Promise<AnalysisResult> {
-  // Fetch GitHub and npm data in parallel
+  // Fetch GitHub data first (repos needed for community metrics)
   const [githubData, npmPackages] = await Promise.all([
     fetchAllGitHubData(username, { token: options.githubToken }),
     fetchNpmData(username).catch(() => []),
@@ -34,7 +34,7 @@ export async function analyzeUser(
 
   const { user, repos, commits, contributions } = githubData;
 
-  // Fetch community metrics (needs repos data first)
+  // Community metrics can now run (uses repos data)
   const communityMetrics = await fetchCommunityMetrics(username, repos, { token: options.githubToken }).catch(
     (): CommunityMetrics => ({
       externalPRs: 0,
