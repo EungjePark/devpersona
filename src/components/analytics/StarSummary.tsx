@@ -88,9 +88,9 @@ export const StarSummary = memo(function StarSummary({
           <h4 className="text-xs text-text-muted uppercase tracking-wider">Add to README</h4>
           <button
             onClick={() => {
-              const endpointUrl = encodeURIComponent(`https://devpersona.app/api/badge/${username}`);
+              const endpointUrl = encodeURIComponent(`https://devpersona-gules.vercel.app/api/badge/${username}`);
               const badgeUrl = `https://img.shields.io/endpoint?url=${endpointUrl}`;
-              const profileUrl = `https://devpersona.app/analyze/${username}`;
+              const profileUrl = `https://devpersona-gules.vercel.app/analyze/${username}`;
               const markdown = `[![DevPersona](${badgeUrl})](${profileUrl})`;
               navigator.clipboard.writeText(markdown);
             }}
@@ -101,7 +101,7 @@ export const StarSummary = memo(function StarSummary({
         </div>
         <div className="p-3 rounded-lg bg-black/20 font-mono text-[11px] text-text-secondary overflow-x-auto whitespace-nowrap">
           <code>
-            {`[![DevPersona](https://img.shields.io/endpoint?url=https%3A%2F%2Fdevpersona.app%2Fapi%2Fbadge%2F${username})](https://devpersona.app/analyze/${username})`}
+            {`[![DevPersona](https://img.shields.io/endpoint?url=https%3A%2F%2Fdevpersona-gules.vercel.app%2Fapi%2Fbadge%2F${username})](https://devpersona-gules.vercel.app/analyze/${username})`}
           </code>
         </div>
       </div>

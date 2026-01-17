@@ -172,6 +172,37 @@ export const getFamousDevelopersList = action({
   },
 });
 
+// Calculate weighted overall rating (same as lib/analysis/signals.ts)
+function calculateWeightedRating(signals: {
+  grit: number;
+  focus: number;
+  craft: number;
+  impact: number;
+  voice: number;
+  reach: number;
+}): number {
+  const weights = {
+    grit: 1.5,    // Consistency matters
+    focus: 1.5,   // Focus matters
+    craft: 1.5,   // Quality matters
+    impact: 1.0,  // npm presence
+    voice: 1.2,   // Community collaboration
+    reach: 1.2,   // Influence
+  };
+
+  const totalWeight = 1.5 + 1.5 + 1.5 + 1.0 + 1.2 + 1.2; // 7.9
+
+  const weightedSum =
+    signals.grit * weights.grit +
+    signals.focus * weights.focus +
+    signals.craft * weights.craft +
+    signals.impact * weights.impact +
+    signals.voice * weights.voice +
+    signals.reach * weights.reach;
+
+  return Math.round(weightedSum / totalWeight);
+}
+
 // Pre-calculated analysis data for famous developers (no GitHub API needed)
 // This allows instant seeding without rate limit concerns
 // ~100 developers from various categories
@@ -318,9 +349,14 @@ export const quickSeed = action({
 
     for (const dev of PRECALCULATED_ANALYSES) {
       try {
-        const overallRating = Math.round(
-          (dev.grit + dev.focus + dev.craft + dev.impact + dev.voice + dev.reach) / 6
-        );
+        const overallRating = calculateWeightedRating({
+          grit: dev.grit,
+          focus: dev.focus,
+          craft: dev.craft,
+          impact: dev.impact,
+          voice: dev.voice,
+          reach: dev.reach,
+        });
 
         await ctx.runMutation(internal.seed.saveSeedAnalysis, {
           username: dev.username,
@@ -366,9 +402,14 @@ export const internalQuickSeed = internalAction({
 
     for (const dev of PRECALCULATED_ANALYSES) {
       try {
-        const overallRating = Math.round(
-          (dev.grit + dev.focus + dev.craft + dev.impact + dev.voice + dev.reach) / 6
-        );
+        const overallRating = calculateWeightedRating({
+          grit: dev.grit,
+          focus: dev.focus,
+          craft: dev.craft,
+          impact: dev.impact,
+          voice: dev.voice,
+          reach: dev.reach,
+        });
 
         await ctx.runMutation(internal.seed.saveSeedAnalysis, {
           username: dev.username,
