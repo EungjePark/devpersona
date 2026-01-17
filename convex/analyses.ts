@@ -195,3 +195,16 @@ export const getByUsername = query({
       .first();
   },
 });
+
+// Mutation: Delete all analyses (for resetting seed data)
+export const deleteAllAnalyses = mutation({
+  handler: async (ctx: MutationCtx) => {
+    const allAnalyses = await ctx.db.query("analyses").collect();
+    let count = 0;
+    for (const analysis of allAnalyses) {
+      await ctx.db.delete(analysis._id);
+      count++;
+    }
+    return { deleted: count };
+  },
+});
