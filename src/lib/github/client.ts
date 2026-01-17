@@ -259,72 +259,55 @@ export async function fetchCommunityMetrics(
 ): Promise<CommunityMetrics> {
   const apiBase = getApiBase(options.token);
 
-  // Sample top 10 repos by stars (most likely to have community engagement)
+  // Sample top 5 repos by stars (reduced for performance)
   const topRepos = repos
     .filter(r => !r.fork && !r.archived)
     .sort((a, b) => b.stargazers_count - a.stargazers_count)
-    .slice(0, 10);
+    .slice(0, 5);
 
-  let prsReceived = 0;
-  let issuesReceived = 0;
+  // Fetch PRs and issues in PARALLEL for all repos (skip contributors - too slow)
+  const repoMetrics = await Promise.all(
+    topRepos.map(async (repo) => {
+      try {
+        // Parallel fetch PRs and issues for this repo
+        const [prsResponse, issuesResponse] = await Promise.all([
+          fetch(`${apiBase}/repos/${repo.full_name}/pulls?state=all&per_page=50`, {
+            headers: getHeaders(options.token),
+            next: { revalidate: 3600 },
+          }),
+          fetch(`${apiBase}/repos/${repo.full_name}/issues?state=all&per_page=50`, {
+            headers: getHeaders(options.token),
+            next: { revalidate: 3600 },
+          }),
+        ]);
+
+        let prs = 0;
+        let issues = 0;
+
+        if (prsResponse.ok) {
+          const prData: { user: { login: string } }[] = await prsResponse.json();
+          prs = prData.filter(pr => pr.user.login.toLowerCase() !== username.toLowerCase()).length;
+        }
+
+        if (issuesResponse.ok) {
+          const issueData: { user: { login: string }; pull_request?: unknown }[] = await issuesResponse.json();
+          issues = issueData.filter(
+            issue => !issue.pull_request && issue.user.login.toLowerCase() !== username.toLowerCase()
+          ).length;
+        }
+
+        return { prs, issues };
+      } catch {
+        return { prs: 0, issues: 0 };
+      }
+    })
+  );
+
+  // Aggregate results
+  const prsReceived = repoMetrics.reduce((sum, m) => sum + m.prs, 0);
+  const issuesReceived = repoMetrics.reduce((sum, m) => sum + m.issues, 0);
+  // Skip contributors count for performance - estimate from stars instead
   const contributorSet = new Set<string>();
-
-  // Fetch PRs, issues, and contributors for each repo
-  for (const repo of topRepos) {
-    try {
-      // Fetch PRs (state=all to get merged PRs too)
-      const prsResponse = await fetch(
-        `${apiBase}/repos/${repo.full_name}/pulls?state=all&per_page=100`,
-        {
-          headers: getHeaders(options.token),
-          next: { revalidate: 3600 },
-        }
-      );
-      if (prsResponse.ok) {
-        const prs: { user: { login: string } }[] = await prsResponse.json();
-        // Count PRs from other users (not the repo owner)
-        const externalPRs = prs.filter(pr => pr.user.login.toLowerCase() !== username.toLowerCase());
-        prsReceived += externalPRs.length;
-      }
-
-      // Fetch issues (exclude PRs which also appear in issues endpoint)
-      const issuesResponse = await fetch(
-        `${apiBase}/repos/${repo.full_name}/issues?state=all&per_page=100`,
-        {
-          headers: getHeaders(options.token),
-          next: { revalidate: 3600 },
-        }
-      );
-      if (issuesResponse.ok) {
-        const issues: { user: { login: string }; pull_request?: unknown }[] = await issuesResponse.json();
-        // Filter out PRs (they have pull_request field) and owner's issues
-        const externalIssues = issues.filter(
-          issue => !issue.pull_request && issue.user.login.toLowerCase() !== username.toLowerCase()
-        );
-        issuesReceived += externalIssues.length;
-      }
-
-      // Fetch contributors
-      const contributorsResponse = await fetch(
-        `${apiBase}/repos/${repo.full_name}/contributors?per_page=100`,
-        {
-          headers: getHeaders(options.token),
-          next: { revalidate: 3600 },
-        }
-      );
-      if (contributorsResponse.ok) {
-        const contributors: { login: string }[] = await contributorsResponse.json();
-        contributors.forEach(c => {
-          if (c.login.toLowerCase() !== username.toLowerCase()) {
-            contributorSet.add(c.login.toLowerCase());
-          }
-        });
-      }
-    } catch {
-      // Skip failed repos
-      continue;
-    }
-  }
 
   // Fetch external PRs (user's PRs to other repos) via search API
   let externalPRs = 0;
