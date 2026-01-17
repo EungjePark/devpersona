@@ -127,16 +127,6 @@ export function DistributionChart({
           ? TIERS.B.color
           : TIERS.C.color;
 
-  // Compare tier color - reserved for future enhanced comparison view
-  void (compareRating !== undefined
-    ? compareRating >= 90
-      ? TIERS.S.color
-      : compareRating >= 75
-        ? TIERS.A.color
-        : compareRating >= 50
-          ? TIERS.B.color
-          : TIERS.C.color
-    : '#f97316');
 
   // Calculate positions
   const userMarkerX = CHART_PADDING.left + (currentRating / 100) * innerWidth;

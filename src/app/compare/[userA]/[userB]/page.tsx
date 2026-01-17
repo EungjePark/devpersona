@@ -117,10 +117,6 @@ function UserCard({ result, isWinner, side }: { result: AnalysisResult; isWinner
 }
 
 function StatCompareRow({ label, emoji, valueA, valueB }: { label: string; emoji: string; valueA: number; valueB: number }) {
-  // Reserved for future enhanced comparison UI (percentage bars, diff indicators)
-  void (valueA - valueB); // diff
-  void Math.max(valueA, valueB, 1); // maxValue
-
   return (
     <div className="grid grid-cols-[1fr_100px_1fr] gap-4 items-center py-3 border-b border-white/5 last:border-0">
       {/* User A bar */}
