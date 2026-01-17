@@ -15,7 +15,7 @@ import { LanguageEvolution, NpmPerformance, CareerPhase } from '@/components/car
 import { StreakStats, CodingPatterns, TrendAnalysis, CodeOwnership, StarSummary, TopRepositories } from '@/components/analytics';
 import { PoweredBySceneSteller } from '@/components/SceneStellerBranding';
 import { ProfileTabs, TabPanel, type TabId, isValidTabId } from '@/components/layout/ProfileTabs';
-import { analyzeUser, getRandomRoast } from '@/lib/analysis';
+import { getRandomRoast } from '@/lib/analysis';
 import { ARCHETYPES } from '@/lib/analysis/archetypes';
 import { getSignalBreakdown, type SignalBreakdown } from '@/lib/analysis/breakdowns';
 import type { SignalScores } from '@/lib/types';
@@ -214,7 +214,12 @@ export default function AnalyzeClient({ username }: AnalyzeClientProps) {
     setError(null);
 
     try {
-      const data = await analyzeUser(username);
+      const response = await fetch(`/api/analyze/${encodeURIComponent(username)}`);
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP ${response.status}`);
+      }
+      const data = await response.json();
       setResult(data);
       setRoast(getRandomRoast(data.archetype));
 
