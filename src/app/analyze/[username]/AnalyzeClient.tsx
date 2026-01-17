@@ -7,15 +7,17 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useAction } from 'convex/react';
 import { api } from '../../../../convex/_generated/api';
 import { Button } from '@/components/ui/button';
-import { FIFACard, ContributionGraph, AchievementBadges, TierListComparison, HexagonRadar, SignalBars, GlobalRanking } from '@/components/cards';
-import { SceneStellerGallery } from '@/components/cards/SceneStellerGallery';
+import { FIFACard, ContributionGraph, AchievementBadges, TierListComparison, HexagonRadar, SignalBars, SignalBarsGrid, GlobalRanking, SceneStellerAvatar } from '@/components/cards';
+import { ScoreBreakdownModal } from '@/components/cards/ScoreBreakdownModal';
+import { BadgeShowcase } from '@/components/cards/BadgeShowcase';
 import { LeaderboardPanel, DistributionChart, MiniLeaderboard } from '@/components/leaderboard';
 import { LanguageEvolution, NpmPerformance, CareerPhase } from '@/components/career';
 import { StreakStats, CodingPatterns, TrendAnalysis, CodeOwnership, StarSummary, TopRepositories } from '@/components/analytics';
 import { PoweredBySceneSteller } from '@/components/SceneStellerBranding';
-import { SceneStellerMiniCTA } from '@/components/SceneStellerMiniCTA';
 import { ProfileTabs, TabPanel, type TabId, isValidTabId } from '@/components/layout/ProfileTabs';
 import { analyzeUser, getRandomRoast } from '@/lib/analysis';
+import { getSignalBreakdown, type SignalBreakdown } from '@/lib/analysis/breakdowns';
+import type { SignalScores } from '@/lib/types';
 import { buildShareUrl } from '@/lib/url-state';
 import type { AnalysisResult, TierLevel } from '@/lib/types';
 import { TIER_DESIGN_TOKENS, TIERS } from '@/lib/types';
@@ -93,6 +95,7 @@ const ProfileHeader = memo(function ProfileHeader({ result, userRank, tierDesign
             fill
             className="object-cover"
             unoptimized
+            priority
           />
         </div>
         <div
@@ -132,16 +135,6 @@ const ProfileHeader = memo(function ProfileHeader({ result, userRank, tierDesign
           <div className="text-xs text-text-muted uppercase tracking-wider">Tier</div>
         </div>
 
-        {/* SceneSteller CTA */}
-        <div className="hidden sm:block">
-          <SceneStellerMiniCTA
-            username={result.username}
-            tier={result.tier.level}
-            archetypeId={result.archetype.id}
-            archetypeName={result.archetype.name}
-            signals={result.signals}
-          />
-        </div>
       </div>
     </div>
   );
@@ -157,6 +150,7 @@ export default function AnalyzeClient({ username }: AnalyzeClientProps) {
   const [copySuccess, setCopySuccess] = useState(false);
   const [showCompareInput, setShowCompareInput] = useState(false);
   const [compareUsername, setCompareUsername] = useState('');
+  const [breakdownModal, setBreakdownModal] = useState<SignalBreakdown | null>(null);
   const compareInputRef = useRef<HTMLInputElement>(null);
 
   // Tab state from URL
@@ -237,6 +231,19 @@ export default function AnalyzeClient({ username }: AnalyzeClientProps) {
       router.push(`/compare/${username}/${target}`);
     }
   }, [compareUsername, username, router]);
+
+  const handleSignalClick = useCallback((signal: keyof SignalScores) => {
+    if (!result) return;
+    const breakdown = getSignalBreakdown(signal, {
+      repos: result.repos ?? [],
+      followers: result.followers ?? 0,
+      packages: result.npmPackages ?? [],
+      contributions: result.contributions ?? null,
+      communityMetrics: result.communityMetrics,
+      signals: result.signals,
+    });
+    setBreakdownModal(breakdown);
+  }, [result]);
 
   const handleShare = useCallback(async () => {
     if (!result) return;
@@ -321,63 +328,62 @@ ${shareUrl}`;
 
               {/* OVERVIEW Tab */}
               <TabPanel tabId="overview" activeTab={activeTab}>
-                {/* Content Grid */}
-                <div className="grid lg:grid-cols-12 gap-6 items-start">
+                {/* Content Grid - FIFA Card left, Big Hexagon right */}
+                <div className="grid lg:grid-cols-12 gap-8 items-start">
 
-                  {/* Left: FIFA Card (Fits 5 columns) */}
-                  <div className="lg:col-span-5 flex justify-center lg:justify-start">
-                    <div className="sticky top-8 w-full max-w-[500px] transform hover:scale-[1.01] transition-transform duration-500 ease-out perspective-1000">
-                      <FIFACard
+                  {/* Left: FIFA-style Profile Card with Stats (5 columns) */}
+                  <div className="lg:col-span-5 flex flex-col items-center">
+                    <div className="sticky top-8 w-full max-w-[360px]">
+                      <SceneStellerAvatar
+                        userId={result.username}
                         username={result.username}
                         avatarUrl={result.avatarUrl}
-                        signals={result.signals}
-                        overallRating={result.overallRating}
-                        tier={result.tier}
+                        bio={result.bio}
+                        followers={result.followers}
+                        totalStars={result.totalStars}
+                        tier={result.tier.level}
+                        tierColor={result.tier.color}
                         archetypeId={result.archetype.id}
                         archetypeName={result.archetype.name}
-                        roast={roast}
+                        overallRating={result.overallRating}
+                        signals={result.signals}
                         rank={userRank?.rank}
-                        className="shadow-2xl shadow-black/50"
                       />
                     </div>
                   </div>
 
-                  {/* Right: FM-Style Attribute Analysis Panel (Fits 7 columns) */}
-                  <div className="lg:col-span-7 h-full">
-                    <div className="bg-bg-secondary/50 backdrop-blur-md rounded-2xl p-6 border border-white/5 h-full flex flex-col">
-                      <div className="flex items-center justify-between mb-6 border-b border-white/5 pb-4">
-                        <h3 className="text-sm font-semibold text-text-secondary flex items-center gap-2 uppercase tracking-wider">
-                          <span>📊</span> Attribute Analysis
-                        </h3>
-                        <div className="px-3 py-1 rounded-full bg-white/5 border border-white/5 text-xs font-medium text-text-muted">
-                          FM View
-                        </div>
-                      </div>
-
-                      <div className="flex-1 grid md:grid-cols-2 gap-6 items-center">
-                        {/* Radar Chart (Visual) */}
-                        <div className="flex items-center justify-center relative">
-                          {/* Subtle background grid/glow */}
-                          <div className="absolute inset-0 bg-radial-gradient from-white/5 to-transparent opacity-30 blur-2xl rounded-full" />
-                          <HexagonRadar
-                            signals={result.signals}
-                            size={320}
-                            tierColor={result.tier.color}
-                            className="relative z-10 drop-shadow-2xl"
-                          />
-                        </div>
-
-                        {/* Detailed Attributes (Data) */}
-                        <div className="bg-bg-tertiary/20 rounded-xl p-5 border border-white/5 h-full flex flex-col justify-center">
-                          <div className="mb-5">
-                            <h4 className="text-xs font-bold text-text-muted uppercase tracking-widest mb-2">Technical Profile</h4>
-                            <div className="h-0.5 w-12 bg-white/10 rounded-full" />
-                          </div>
-                          <SignalBars signals={result.signals} showGrade={true} />
-                        </div>
-                      </div>
+                  {/* Right: Hexagon Chart (7 columns) */}
+                  <div className="lg:col-span-7 flex items-center justify-center py-8">
+                    <div className="relative">
+                      {/* Glow effect */}
+                      <div className="absolute inset-0 bg-radial-gradient from-white/5 to-transparent opacity-40 blur-3xl rounded-full scale-125" />
+                      <HexagonRadar
+                        signals={result.signals}
+                        size={380}
+                        tierColor={result.tier.color}
+                        showLabels={true}
+                        className="relative z-10 drop-shadow-2xl"
+                      />
                     </div>
                   </div>
+                </div>
+
+                {/* Signal Analysis - Full Width 2x3 Grid */}
+                <div className="mt-8 bg-bg-secondary/50 backdrop-blur-md rounded-2xl p-6 border border-white/5">
+                  <div className="flex items-center justify-between mb-6 border-b border-white/5 pb-4">
+                    <h3 className="text-sm font-mono font-semibold text-text-secondary uppercase tracking-wider flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: result.tier.color }} />
+                      Signal Analysis
+                    </h3>
+                    <div className="px-3 py-1 rounded-full bg-white/5 text-xs font-medium text-text-muted border border-white/10">
+                      Click signal for details
+                    </div>
+                  </div>
+                  <SignalBars
+                    signals={result.signals}
+                    showGrade={true}
+                    onSignalClick={handleSignalClick}
+                  />
                 </div>
 
                 {/* Combined Activity & Achievements Panel */}
@@ -415,17 +421,9 @@ ${shareUrl}`;
                             (sum, pkg) => sum + (pkg.downloads || 0),
                             0
                           ),
-                          hnPoints: result.hnStats.points,
+                          externalPRs: result.communityMetrics?.externalPRs ?? 0,
                         }}
                       />
-                    </div>
-
-                    {/* SceneSteller Gallery */}
-                    <div className="p-8 border-t border-white/5">
-                      <h3 className="text-sm font-semibold text-text-secondary flex items-center gap-2 uppercase tracking-wider mb-4">
-                        <span>✨</span> AI Art Gallery
-                      </h3>
-                      <SceneStellerGallery userId={result.username} maxImages={6} />
                     </div>
                   </div>
                 )}
@@ -727,9 +725,9 @@ ${shareUrl}`;
                             </div>
                             <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.05] text-center">
                               <div className="text-2xl lg:text-3xl font-black text-pink-400">
-                                {result.hnStats.points}
+                                {result.communityMetrics?.externalPRs ?? 0}
                               </div>
-                              <div className="text-[9px] font-mono uppercase text-text-muted mt-1">HN.KARMA</div>
+                              <div className="text-[9px] font-mono uppercase text-text-muted mt-1">EXT.PRS</div>
                             </div>
                           </div>
                         </div>
@@ -752,7 +750,7 @@ ${shareUrl}`;
                       <div className="grid lg:grid-cols-2 gap-8">
                         {/* Left: Signal Bars */}
                         <div className="space-y-1">
-                          <SignalBars signals={result.signals} showGrade />
+                          <SignalBars signals={result.signals} showGrade onSignalClick={handleSignalClick} />
                         </div>
 
                         {/* Right: Archetype + Progression */}
@@ -818,11 +816,11 @@ ${shareUrl}`;
                   </div>
 
                   {/* === CONTRIBUTION MATRIX === */}
+                  {/* === CONTRIBUTION ACTIVITY === */}
                   {result.contributions && (
-                    <div className="grid lg:grid-cols-3 gap-6">
-
-                      {/* Contribution Graph - Spans 2 columns */}
-                      <div className="lg:col-span-2 relative overflow-hidden rounded-2xl bg-gradient-to-br from-zinc-900/60 to-black/60 border border-white/[0.05]">
+                    <div className="space-y-6">
+                      {/* 1. Full Width Contribution Graph */}
+                      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-zinc-900/60 to-black/60 border border-white/[0.05]">
                         <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-emerald-500/30 to-transparent" />
                         <div className="p-6">
                           <div className="flex items-center gap-3 mb-5">
@@ -838,60 +836,58 @@ ${shareUrl}`;
                         </div>
                       </div>
 
-                      {/* Streak Stats - Single column */}
-                      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-orange-950/20 to-black/60 border border-orange-500/10">
-                        <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-orange-500/30 to-transparent" />
-                        <div className="p-6">
-                          <div className="flex items-center gap-3 mb-5">
-                            <div className="w-1 h-6 rounded-full bg-orange-500" />
-                            <h3 className="text-xs font-mono uppercase tracking-[0.15em] text-text-secondary">
-                              STREAK.DATA
-                            </h3>
+                      {/* 2. Three-Column Stats Grid */}
+                      <div className="grid lg:grid-cols-3 gap-6">
+                        {/* Streak Stats */}
+                        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-orange-950/20 to-black/60 border border-orange-500/10">
+                          <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-orange-500/30 to-transparent" />
+                          <div className="p-6">
+                            <div className="flex items-center gap-3 mb-5">
+                              <div className="w-1 h-6 rounded-full bg-orange-500" />
+                              <h3 className="text-xs font-mono uppercase tracking-[0.15em] text-text-secondary">
+                                STREAK.DATA
+                              </h3>
+                            </div>
+                            <StreakStats
+                              contributions={result.contributions}
+                              tierColor={result.tier.color}
+                            />
                           </div>
-                          <StreakStats
-                            contributions={result.contributions}
-                            tierColor={result.tier.color}
-                          />
                         </div>
-                      </div>
-                    </div>
-                  )}
 
-                  {/* === BEHAVIOR PATTERNS === */}
-                  {result.contributions && (
-                    <div className="grid lg:grid-cols-2 gap-6">
-                      {/* Coding Patterns */}
-                      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-950/20 to-black/60 border border-indigo-500/10">
-                        <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-indigo-500/30 to-transparent" />
-                        <div className="p-6">
-                          <div className="flex items-center gap-3 mb-5">
-                            <div className="w-1 h-6 rounded-full bg-indigo-500" />
-                            <h3 className="text-xs font-mono uppercase tracking-[0.15em] text-text-secondary">
-                              CODING_PATTERNS
-                            </h3>
+                        {/* Coding Patterns */}
+                        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-950/20 to-black/60 border border-indigo-500/10">
+                          <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-indigo-500/30 to-transparent" />
+                          <div className="p-6">
+                            <div className="flex items-center gap-3 mb-5">
+                              <div className="w-1 h-6 rounded-full bg-indigo-500" />
+                              <h3 className="text-xs font-mono uppercase tracking-[0.15em] text-text-secondary">
+                                CODING_PATTERNS
+                              </h3>
+                            </div>
+                            <CodingPatterns
+                              contributions={result.contributions}
+                              pattern={result.pattern.type}
+                              tierColor={result.tier.color}
+                            />
                           </div>
-                          <CodingPatterns
-                            contributions={result.contributions}
-                            pattern={result.pattern.type}
-                            tierColor={result.tier.color}
-                          />
                         </div>
-                      </div>
 
-                      {/* Trend Analysis */}
-                      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-950/20 to-black/60 border border-cyan-500/10">
-                        <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-cyan-500/30 to-transparent" />
-                        <div className="p-6">
-                          <div className="flex items-center gap-3 mb-5">
-                            <div className="w-1 h-6 rounded-full bg-cyan-500" />
-                            <h3 className="text-xs font-mono uppercase tracking-[0.15em] text-text-secondary">
-                              TREND_ANALYSIS
-                            </h3>
+                        {/* Trend Analysis */}
+                        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-950/20 to-black/60 border border-cyan-500/10">
+                          <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-cyan-500/30 to-transparent" />
+                          <div className="p-6">
+                            <div className="flex items-center gap-3 mb-5">
+                              <div className="w-1 h-6 rounded-full bg-cyan-500" />
+                              <h3 className="text-xs font-mono uppercase tracking-[0.15em] text-text-secondary">
+                                TREND_ANALYSIS
+                              </h3>
+                            </div>
+                            <TrendAnalysis
+                              contributions={result.contributions}
+                              tierColor={result.tier.color}
+                            />
                           </div>
-                          <TrendAnalysis
-                            contributions={result.contributions}
-                            tierColor={result.tier.color}
-                          />
                         </div>
                       </div>
                     </div>
@@ -938,6 +934,60 @@ ${shareUrl}`;
                       </button>
                     </div>
                   </div>
+
+                </div>
+              </TabPanel>
+
+              {/* BADGES Tab - Achievement Gallery */}
+              <TabPanel tabId="badges" activeTab={activeTab}>
+                <div className="space-y-6">
+
+                  {/* === BADGES HEADER === */}
+                  <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-amber-950/40 via-black to-yellow-950/40 border border-amber-500/20">
+                    {/* Sparkle effects */}
+                    <div className="absolute inset-0 opacity-30">
+                      {[...Array(5)].map((_, i) => (
+                        <div
+                          key={i}
+                          className="absolute w-1 h-1 rounded-full bg-amber-400 animate-pulse"
+                          style={{
+                            left: `${20 + i * 15}%`,
+                            top: `${30 + (i % 2) * 40}%`,
+                            animationDelay: `${i * 0.2}s`,
+                          }}
+                        />
+                      ))}
+                    </div>
+
+                    {/* Trophy Background Icon */}
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <span className="text-[150px] select-none opacity-[0.03]">🏆</span>
+                    </div>
+
+                    <div className="relative z-10 p-8 lg:p-10">
+                      {/* Header */}
+                      <div className="flex items-center justify-center gap-3 mb-6">
+                        <div className="h-px flex-1 bg-gradient-to-r from-transparent via-amber-500/50 to-transparent" />
+                        <span className="text-[10px] font-mono uppercase tracking-[0.3em] text-amber-400">ACHIEVEMENT VAULT</span>
+                        <div className="h-px flex-1 bg-gradient-to-r from-transparent via-amber-500/50 to-transparent" />
+                      </div>
+
+                      <div className="text-center mb-6">
+                        <h2 className="text-2xl font-black text-white mb-2">Badges & Milestones</h2>
+                        <p className="text-sm text-text-muted">Unlock achievements through consistent coding and open source contributions</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* === BADGE SHOWCASE === */}
+                  {result.achievements && (
+                    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-b from-zinc-900/80 to-black border border-white/[0.06]">
+                      <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-amber-500/30 to-transparent" />
+                      <div className="p-6">
+                        <BadgeShowcase achievements={result.achievements} />
+                      </div>
+                    </div>
+                  )}
 
                 </div>
               </TabPanel>
@@ -1065,12 +1115,15 @@ ${shareUrl}`;
                         </div>
 
                         {/* Opponent Placeholder */}
-                        <div className="text-center">
-                          <div className="w-20 h-20 rounded-2xl border-2 border-dashed border-white/20 mx-auto mb-3 flex items-center justify-center bg-white/[0.02]">
-                            <span className="text-2xl text-white/20">?</span>
+                        <div
+                          className="text-center cursor-pointer group hover:bg-white/5 p-2 rounded-2xl transition-all"
+                          onClick={() => setShowCompareInput(true)}
+                        >
+                          <div className="w-20 h-20 rounded-2xl border-2 border-dashed border-white/20 mx-auto mb-3 flex items-center justify-center bg-white/[0.02] group-hover:bg-white/[0.05] transition-colors">
+                            <span className="text-2xl text-white/20 group-hover:text-white/40 transition-colors">?</span>
                           </div>
-                          <div className="text-sm font-medium text-text-muted">Awaiting</div>
-                          <div className="text-2xl font-black text-white/20 mt-1">---</div>
+                          <div className="text-sm font-medium text-text-muted group-hover:text-white transition-colors">Awaiting</div>
+                          <div className="text-2xl font-black text-white/20 mt-1 group-hover:text-white/40 transition-colors">---</div>
                           <div className="text-[10px] font-bold uppercase tracking-wider text-white/20 mt-1">
                             CHALLENGER
                           </div>
@@ -1086,12 +1139,6 @@ ${shareUrl}`;
                     <div className="lg:col-span-3 relative overflow-hidden rounded-2xl bg-gradient-to-b from-zinc-900/80 to-black border border-white/[0.06]">
                       <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-yellow-500/30 to-transparent" />
                       <div className="p-6">
-                        <div className="flex items-center gap-3 mb-4">
-                          <div className="w-1 h-6 rounded-full bg-yellow-500" />
-                          <h3 className="text-xs font-mono uppercase tracking-[0.15em] text-text-secondary">
-                            GLOBAL_RANKINGS
-                          </h3>
-                        </div>
                         <LeaderboardPanel
                           currentUsername={result.username}
                           currentRating={result.overallRating}
@@ -1103,12 +1150,6 @@ ${shareUrl}`;
                     <div className="lg:col-span-2 relative overflow-hidden rounded-2xl bg-gradient-to-b from-zinc-900/80 to-black border border-white/[0.06]">
                       <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-purple-500/30 to-transparent" />
                       <div className="p-6">
-                        <div className="flex items-center gap-3 mb-4">
-                          <div className="w-1 h-6 rounded-full bg-purple-500" />
-                          <h3 className="text-xs font-mono uppercase tracking-[0.15em] text-text-secondary">
-                            TIER_STATUS
-                          </h3>
-                        </div>
                         <TierListComparison
                           currentUsername={result.username}
                           currentRating={result.overallRating}
@@ -1145,12 +1186,6 @@ ${shareUrl}`;
                     <div className="relative overflow-hidden rounded-2xl bg-gradient-to-b from-zinc-900/80 to-black border border-white/[0.06]">
                       <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-cyan-500/30 to-transparent" />
                       <div className="p-6">
-                        <div className="flex items-center gap-3 mb-4">
-                          <div className="w-1 h-6 rounded-full bg-cyan-500" />
-                          <h3 className="text-xs font-mono uppercase tracking-[0.15em] text-text-secondary">
-                            GITHUB_STAR_RANKING
-                          </h3>
-                        </div>
                         <GlobalRanking totalStars={result.totalStars} username={result.username} />
                       </div>
                     </div>
@@ -1165,12 +1200,19 @@ ${shareUrl}`;
             <div className="mt-8 pb-8 pt-4">
               <PoweredBySceneSteller />
               <p className="text-center text-xs text-text-muted/40 font-mono uppercase tracking-widest mt-2">
-                Analysis via GitHub • npm • Hacker News
+                Analysis via GitHub • npm • Community Data
               </p>
             </div>
           </div>
         )}
       </div>
+
+      {/* Score Breakdown Modal */}
+      <ScoreBreakdownModal
+        breakdown={breakdownModal}
+        isOpen={breakdownModal !== null}
+        onClose={() => setBreakdownModal(null)}
+      />
     </div>
   );
 }

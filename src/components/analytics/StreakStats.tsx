@@ -8,7 +8,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import type { ContributionStats } from '@/lib/types';
-import { CHART_THEME, CHART_ANIMATION } from '@/lib/chart-config';
+import { CHART_THEME, CHART_ANIMATION, ChartContainer } from '@/lib/chart-config';
 
 interface StreakStatsProps {
   contributions: ContributionStats;
@@ -44,17 +44,17 @@ function StreakGauge({
 
   return (
     <div className="relative flex flex-col items-center">
-      <div className="h-28 w-full min-w-[120px]">
-        <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
+      <ChartContainer className="h-48 w-full min-w-[120px]">
+        <ResponsiveContainer width="100%" height="100%" minWidth={100} minHeight={100} debounce={50}>
           <PieChart>
             <Pie
               data={data}
               cx="50%"
-              cy="90%"
+              cy="70%"
               startAngle={180}
               endAngle={0}
-              innerRadius={60}
-              outerRadius={80}
+              innerRadius={55}
+              outerRadius={75}
               paddingAngle={0}
               dataKey="value"
               animationDuration={CHART_ANIMATION.duration}
@@ -65,13 +65,13 @@ function StreakGauge({
             </Pie>
           </PieChart>
         </ResponsiveContainer>
-      </div>
+      </ChartContainer>
       {/* Center value */}
-      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 text-center">
+      <div className="absolute bottom-12 left-1/2 -translate-x-1/2 text-center">
         <div className="text-3xl font-black" style={{ color: tierColor }}>
           {value}
         </div>
-        <div className="text-[10px] text-text-muted uppercase tracking-wider">
+        <div className="text-[10px] text-text-muted uppercase tracking-wider font-bold">
           {label}
         </div>
       </div>

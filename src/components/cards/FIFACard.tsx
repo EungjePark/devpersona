@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import { type SignalScores, type Tier, type ArchetypeId } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { useMemo } from 'react';
 
 interface FIFACardProps {
   username: string;
@@ -17,139 +18,200 @@ interface FIFACardProps {
   className?: string;
 }
 
-const TIER_STYLES: Record<string, string> = {
-  S: 'card-legendary',
-  A: 'card-epic',
-  B: 'card-rare',
-  C: 'card-common',
+const ARCHETYPE_ABBREVIATIONS: Record<ArchetypeId, string> = {
+  maintainer: 'MTN',
+  silent_builder: 'BLD',
+  prototype_machine: 'PTM',
+  specialist: 'SPC',
+  hype_surfer: 'HYP',
+  archivist: 'ARC',
+  comeback_kid: 'CBK',
+  ghost: 'GST',
 };
 
-const TIER_BG_COLORS: Record<string, string> = {
-  S: '#d97706', // Amber 600
-  A: '#9333ea', // Purple 600
-  B: '#2563eb', // Blue 600
-  C: '#52525b', // Zinc 600
+const CARD_STYLES: Record<string, {
+  borderGradient: string;
+  bgGradient: string;
+  innerBorder: string;
+  textColor: string;
+  accentColor: string;
+  textureOpacity: number;
+}> = {
+  S: { // Legendary (Gold)
+    borderGradient: 'from-[#ffd700] via-[#fbf3c8] to-[#b45309]',
+    bgGradient: 'linear-gradient(to bottom, #d6ad60, #f4e4bc, #b08d55)',
+    innerBorder: 'from-[#b45309] via-[#854d0e] to-[#ffd700]',
+    textColor: '#451a03',
+    accentColor: '#b45309',
+    textureOpacity: 0.1,
+  },
+  A: { // Epic (Purple)
+    borderGradient: 'from-[#e879f9] via-[#f5d0fe] to-[#7e22ce]',
+    bgGradient: 'linear-gradient(to bottom, #a28ce0, #d8b4fe, #7e22ce)',
+    innerBorder: 'from-[#6b21a8] via-[#581c87] to-[#e879f9]',
+    textColor: '#3b0764',
+    accentColor: '#6b21a8',
+    textureOpacity: 0.15,
+  },
+  B: { // Rare (Blue)
+    borderGradient: 'from-[#38bdf8] via-[#bae6fd] to-[#0369a1]',
+    bgGradient: 'linear-gradient(to bottom, #60a5fa, #bfdbfe, #2563eb)',
+    innerBorder: 'from-[#1e40af] via-[#1e3a8a] to-[#38bdf8]',
+    textColor: '#0c4a6e',
+    accentColor: '#0369a1',
+    textureOpacity: 0.12,
+  },
+  C: { // Common (Silver)
+    borderGradient: 'from-[#d1d5db] via-[#f3f4f6] to-[#4b5563]',
+    bgGradient: 'linear-gradient(to bottom, #9ca3af, #e5e7eb, #6b7280)',
+    innerBorder: 'from-[#374151] via-[#1f2937] to-[#d1d5db]',
+    textColor: '#1f2937',
+    accentColor: '#374151',
+    textureOpacity: 0.08,
+  },
 };
 
-// Full archetype names for display
-const ARCHETYPE_DISPLAY: Record<ArchetypeId, { abbrev: string; full: string }> = {
-  maintainer: { abbrev: 'MTN', full: 'The Maintainer' },
-  silent_builder: { abbrev: 'SLB', full: 'Silent Builder' },
-  prototype_machine: { abbrev: 'PTM', full: 'Prototype Machine' },
-  specialist: { abbrev: 'SPC', full: 'The Specialist' },
-  hype_surfer: { abbrev: 'HYP', full: 'Hype Surfer' },
-  archivist: { abbrev: 'ARC', full: 'The Archivist' },
-  comeback_kid: { abbrev: 'CBK', full: 'Comeback Kid' },
-  ghost: { abbrev: 'GHT', full: 'Ghost Developer' },
-};
+// Map signals to FIFA-style stats
+// PAC (Pace) -> GRIND (Speed/Consistency)
+// SHO (Shooting) -> BOOM (Impact)
+// PAS (Passing) -> CLOUT (Connection/Influence)
+// DRI (Dribbling) -> SHINE (Flair/Creativity)
+// DEF (Defending) -> DEPTH (Technical/Deep knowledge)
+// PHY (Physical) -> VIBE (Endurance/Culture)
 
 export function FIFACard({
   username,
   avatarUrl,
-  // signals prop accepted for API compatibility but displayed via overallRating
-  signals: _signals = {} as SignalScores,
+  signals,
   overallRating,
   tier,
   archetypeId,
-  archetypeName,
-  roast,
   rank,
   className,
 }: FIFACardProps) {
-  // Suppress unused variable warning - signals available for future enhancements
-  void _signals;
-  const tierStyle = TIER_STYLES[tier.level] ?? TIER_STYLES.C;
-  const tierColor = TIER_BG_COLORS[tier.level] ?? '#52525b';
-  const archetype = ARCHETYPE_DISPLAY[archetypeId] ?? { abbrev: 'DEV', full: archetypeName };
+  const archetypeCode = ARCHETYPE_ABBREVIATIONS[archetypeId] ?? 'DEV';
+  const style = CARD_STYLES[tier.level] ?? CARD_STYLES.C;
+
+  // Stats for the bottom grid
+  const stats = useMemo(() => [
+    { label: 'GRI', value: signals.grit },
+    { label: 'DEP', value: signals.focus },
+    { label: 'SHI', value: signals.craft },
+    { label: 'BOO', value: signals.impact },
+    { label: 'VIB', value: signals.voice },
+    { label: 'CLO', value: signals.reach },
+  ], [signals]);
 
   return (
-    <div
-      className={cn(
-        'relative w-full max-w-[500px] rounded-3xl p-[1px]', // Thinner organic border
-        tierStyle,
-        className
-      )}
-    >
-      {/* Inner card surface using new glass tokens */}
-      <div className="relative rounded-[23px] bg-bg-secondary/95 backdrop-blur-xl p-6 md:p-8 overflow-hidden h-full flex flex-col justify-between min-h-[500px]">
-
-        {/* Subtle top sheen */}
-        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
-
-        {/* Dynamic Background Glow based on Tier */}
+    <div className={cn("relative mx-auto group", className)} style={{ width: '320px' }}>
+      {/* 
+        FIFA Card Shape Container 
+      */}
+      <div
+        className={cn(
+          "relative w-full aspect-[2/3] p-1.5 shadow-2xl transition-all duration-300",
+          `bg-gradient-to-b ${style.borderGradient}`
+        )}
+        style={{
+          clipPath: 'polygon(20% 0, 80% 0, 100% 15%, 100% 75%, 50% 100%, 0 75%, 0 15%)',
+        }}
+      >
+        {/* Inner Border/Frame */}
         <div
-          className="absolute top-[-20%] right-[-20%] w-[80%] h-[80%] opacity-[0.08] blur-[100px] pointer-events-none rounded-full mix-blend-screen"
-          style={{ backgroundColor: tierColor }}
-        />
-        <div
-          className="absolute bottom-[-10%] left-[-10%] w-[60%] h-[60%] opacity-[0.05] blur-[80px] pointer-events-none rounded-full mix-blend-screen"
-          style={{ backgroundColor: tierColor }}
-        />
+          className={cn(
+            "w-full h-full p-0.5",
+            `bg-gradient-to-br ${style.innerBorder}`
+          )}
+          style={{
+            clipPath: 'polygon(20% 0, 80% 0, 100% 15%, 100% 75%, 50% 100%, 0 75%, 0 15%)',
+          }}
+        >
+          {/* Main Content Area */}
+          <div
+            className="w-full h-full relative"
+            style={{
+              background: style.bgGradient,
+              clipPath: 'polygon(20% 0, 80% 0, 100% 15%, 100% 75%, 50% 100%, 0 75%, 0 15%)',
+            }}
+          >
+            {/* Pattern Overlay */}
+            <div
+              className="absolute inset-0"
+              style={{
+                backgroundImage: `repeating-linear-gradient(45deg, #000 0px, #000 2px, transparent 2px, transparent 8px)`,
+                opacity: style.textureOpacity,
+                mixBlendMode: 'overlay',
+              }}
+            />
 
-        {/* --- Top Bar: Rank & Tier --- */}
-        <div className="flex justify-between items-center relative z-10 w-full mb-6">
-          {rank ? (
-            <div className="px-3 py-1 rounded-full bg-black/40 border border-white/5 backdrop-blur-md">
-              <span className="text-xs font-medium text-text-secondary">#{rank} Global</span>
+            {/* Top Shine */}
+            <div className="absolute top-0 inset-x-0 h-32 bg-gradient-to-b from-white/40 to-transparent mix-blend-soft-light" />
+
+            {/* Top Info Section */}
+            <div className="absolute top-8 left-6 flex flex-col items-center z-20">
+              <span className="text-5xl font-black tracking-tighter leading-none" style={{ color: style.textColor }}>{overallRating}</span>
+              <span className="text-lg font-bold uppercase mt-1" style={{ color: style.textColor }}>{archetypeCode}</span>
+
+              {/* Divider Line */}
+              <div className="w-8 h-0.5 my-2 opacity-40" style={{ backgroundColor: style.textColor }} />
+
+              {/* Tier Logo/Icon Placeholder */}
+              <div className="w-8 h-8 rounded-full border-2 flex items-center justify-center" style={{ borderColor: style.textColor, backgroundColor: 'rgba(255,255,255,0.2)' }}>
+                <span className="text-sm font-bold" style={{ color: style.textColor }}>{tier.level}</span>
+              </div>
             </div>
-          ) : <div />}
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/5 border border-white/5">
-            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: tierColor }} />
-            <span className="text-xs font-bold tracking-wide uppercase" style={{ color: tierColor }}>{tier.name}</span>
-          </div>
-        </div>
 
-        {/* --- Center: Hero Section --- */}
-        <div className="flex-1 flex flex-col items-center justify-center relative z-10 mb-8">
-          {/* OVR Rating with Glow */}
-          <div className="relative mb-6 group">
-            <div className="absolute inset-0 rounded-full blur-2xl opacity-20 group-hover:opacity-40 transition-opacity duration-500" style={{ backgroundColor: tierColor }} />
-            <div className="relative w-32 h-32 flex flex-col items-center justify-center rounded-full bg-bg-tertiary border-4 border-bg-secondary shadow-2xl"
-              style={{ borderColor: `${tierColor}40` }}>
-              <span className="text-6xl font-black tracking-tighter leading-none" style={{ color: tierColor }}>
-                {overallRating}
-              </span>
-              <span className="text-[10px] font-bold text-text-muted uppercase tracking-widest mt-1">OVR</span>
-            </div>
-          </div>
-
-          {/* Avatar */}
-          <div className="relative w-40 h-40 md:w-48 md:h-48 rounded-2xl p-[3px] shadow-2xl rotate-3 hover:rotate-0 transition-transform duration-500 ease-out"
-            style={{ background: `linear-gradient(135deg, ${tierColor}, ${tierColor}20)` }}>
-            <div className="w-full h-full rounded-[13px] overflow-hidden bg-bg-primary relative">
+            {/* Player Image */}
+            <div className="absolute top-6 right-4 w-[180px] h-[180px] z-10">
               <Image
                 src={avatarUrl}
                 alt={username}
                 fill
-                className="object-cover"
+                className="object-cover drop-shadow-xl scale-110 group-hover:scale-115 transition-transform duration-500"
+                style={{
+                  maskImage: 'linear-gradient(to bottom, black 85%, transparent 100%)',
+                  WebkitMaskImage: 'linear-gradient(to bottom, black 85%, transparent 100%)'
+                }}
                 unoptimized
               />
             </div>
-            {/* Tier Badge */}
-            <div
-              className="absolute -bottom-4 -right-4 w-12 h-12 rounded-xl flex items-center justify-center shadow-lg border-2 border-bg-secondary"
-              style={{ backgroundColor: tierColor }}
-            >
-              <span className="text-xl font-black text-white">{tier.level}</span>
+
+            {/* Name Plate */}
+            <div className="absolute top-[55%] left-0 w-full flex flex-col items-center z-20">
+              <div className="w-[85%] text-center border-b-2 pb-1 mb-2" style={{ borderColor: `${style.textColor}40` }}>
+                <h2 className="text-2xl font-black uppercase tracking-tight truncate px-2 drop-shadow-sm" style={{ color: style.textColor }}>{username}</h2>
+              </div>
+
+              {/* Stats Grid */}
+              <div className="grid grid-cols-2 gap-x-6 gap-y-1 w-[80%] mx-auto">
+                {stats.map((stat, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <span className="text-lg font-black" style={{ color: style.textColor }}>{stat.value}</span>
+                    <span className="text-sm font-bold uppercase opacity-80" style={{ color: style.textColor }}>{stat.label}</span>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-        </div>
 
-        {/* --- Footer: Identity --- */}
-        <div className="text-center relative z-10 space-y-4">
-          <div>
-            <h2 className="text-3xl font-black text-white tracking-tight mb-1">@{username}</h2>
-            <p className="text-lg font-medium text-text-secondary opacity-80">{archetype.full}</p>
-          </div>
+            {/* Bottom Decor */}
+            <div className="absolute bottom-16 left-1/2 -translate-x-1/2 flex gap-4 opacity-50">
+              <div className="w-1 h-3" style={{ backgroundColor: style.textColor }} />
+              <div className="w-1 h-3" style={{ backgroundColor: style.textColor }} />
+              <div className="w-1 h-3" style={{ backgroundColor: style.textColor }} />
+            </div>
 
-          {/* Analyst Note (Roast) */}
-          <div className="bg-bg-tertiary/30 rounded-xl p-4 border border-white/5 backdrop-blur-sm mx-2">
-            <p className="text-sm text-text-muted italic leading-relaxed">
-              &ldquo;{roast}&rdquo;
-            </p>
           </div>
         </div>
       </div>
+
+      {/* Rank Badge (Floating) */}
+      {rank && (
+        <div className="absolute top-0 right-0 transform translate-x-1/4 -translate-y-1/4 z-30">
+          <div className="bg-black text-white px-3 py-1 rounded-full text-xs font-bold border-2 shadow-lg" style={{ borderColor: style.accentColor }}>
+            #{rank}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

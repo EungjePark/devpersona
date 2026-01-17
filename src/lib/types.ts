@@ -16,7 +16,7 @@ export const SIGNAL_LABELS: Record<keyof SignalScores, { name: string; descripti
   focus: { name: 'DEPTH', description: 'How deep you go', emoji: '🎯' },
   craft: { name: 'SHINE', description: 'How polished your work is', emoji: '✨' },
   impact: { name: 'BOOM', description: 'How viral your packages are', emoji: '💥' },
-  voice: { name: 'VIBE', description: 'How much you engage', emoji: '🗣️' },
+  voice: { name: 'COMMUNITY', description: 'How much you collaborate', emoji: '🤝' },
   reach: { name: 'CLOUT', description: 'How famous you are', emoji: '👑' },
 };
 
@@ -155,6 +155,7 @@ export interface GitHubRepo {
   pushed_at: string;
   created_at: string;
   archived: boolean;
+  fork: boolean;
   has_readme?: boolean;
   license: { name: string } | null;
 }
@@ -218,6 +219,14 @@ export interface ContributionStats {
   averagePerDay: number;
 }
 
+// Community metrics for COMMUNITY signal (replacement for VOICE)
+export interface CommunityMetrics {
+  externalPRs: number;      // PRs to other people's repos
+  prsReceived: number;      // PRs received on own repos
+  issuesReceived: number;   // Issues received on own repos
+  uniqueContributors: number; // Unique contributors across repos
+}
+
 // Repository summary for top repos display
 export interface RepositorySummary {
   name: string;
@@ -241,8 +250,24 @@ export interface AnalysisResult {
   pattern: PatternInfo;
   languages: { name: string; percentage: number }[];
   npmPackages: NpmPackage[];
-  hnStats: { points: number; comments: number; topPost?: string };
+  communityMetrics?: CommunityMetrics;
   contributions: ContributionStats | null;
+  // Raw data for signal breakdowns
+  repos?: GitHubRepo[];
+  followers?: number;
+  // Achievement badges
+  achievements?: Array<{
+    id: string;
+    name: string;
+    description: string;
+    icon: string;
+    tier: 'bronze' | 'silver' | 'gold' | 'platinum' | 'diamond';
+    category: 'streak' | 'volume' | 'consistency' | 'special' | 'language' | 'social' | 'opensource' | 'npm' | 'community' | 'milestone' | 'secret';
+    unlocked: boolean;
+    progress?: number;
+    maxValue?: number;
+    currentValue?: number;
+  }>;
   // GitHub star/repo data
   totalStars?: number;
   totalForks?: number;

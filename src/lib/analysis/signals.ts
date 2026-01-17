@@ -1,6 +1,6 @@
 // Signal calculation algorithms (No AI, pure heuristics)
 
-import type { SignalScores, GitHubRepo, GitHubCommit, NpmPackage, HNItem } from '../types';
+import type { SignalScores, GitHubRepo, GitHubCommit, NpmPackage, CommunityMetrics } from '../types';
 
 /**
  * Calculate GRIT score (0-100)
@@ -100,21 +100,27 @@ export function calculateImpact(packages: NpmPackage[]): number {
 }
 
 /**
- * Calculate VOICE score (0-100)
- * Based on Hacker News points and comments
+ * Calculate COMMUNITY score (0-100)
+ * Based on GitHub collaboration metrics (replacement for VOICE/HN-based)
+ * Weights: externalPRs (3.0), prsReceived (2.0), issues (1.0), contributors (1.5)
  */
-export function calculateVoice(items: HNItem[]): number {
-  if (items.length === 0) return 20; // No HN presence
+export function calculateCommunity(metrics: CommunityMetrics): number {
+  const { externalPRs, prsReceived, issuesReceived, uniqueContributors } = metrics;
 
-  const totalPoints = items.reduce((sum, item) => sum + (item.points || 0), 0);
-  const totalComments = items.reduce((sum, item) => sum + (item.num_comments || 0), 0);
+  // No collaboration activity
+  if (externalPRs === 0 && prsReceived === 0 && issuesReceived === 0 && uniqueContributors === 0) {
+    return 20; // Baseline
+  }
 
-  // Combined score: points matter more
-  const combined = totalPoints + (totalComments * 0.5);
+  // Weighted combination (per plan)
+  const combined =
+    (externalPRs * 3.0) +
+    (prsReceived * 2.0) +
+    (issuesReceived * 1.0) +
+    (uniqueContributors * 1.5);
 
-  if (combined === 0) return 25;
-
-  // Log scale: 10 = 30, 100 = 50, 1000 = 70, 10000 = 90
+  // Log scale scoring
+  // Score formula: min(100, 20 + log10(combined + 1) * 20)
   const logScore = Math.log10(combined + 1);
   const score = Math.min(100, 20 + (logScore * 20));
 
@@ -154,7 +160,7 @@ export function calculateOverallRating(signals: SignalScores): number {
     focus: 1.5,   // Focus matters
     craft: 1.5,   // Quality matters
     impact: 1.0,  // npm presence
-    voice: 0.8,   // HN presence (optional)
+    voice: 1.2,   // Community collaboration (previously 0.8 for HN)
     reach: 1.2,   // Influence
   };
 
@@ -179,14 +185,14 @@ export function calculateAllSignals(
   repos: GitHubRepo[],
   followers: number,
   npmPackages: NpmPackage[],
-  hnItems: HNItem[]
+  communityMetrics: CommunityMetrics
 ): SignalScores {
   return {
     grit: calculateGrit(commits),
     focus: calculateFocus(repos),
     craft: calculateCraft(repos),
     impact: calculateImpact(npmPackages),
-    voice: calculateVoice(hnItems),
+    voice: calculateCommunity(communityMetrics),
     reach: calculateReach(repos, followers),
   };
 }

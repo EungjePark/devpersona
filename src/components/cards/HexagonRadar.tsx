@@ -9,7 +9,7 @@ interface HexagonRadarProps {
   className?: string;
   showLabels?: boolean;
   animated?: boolean;
-  tierColor?: string; // For tier-based glow effect
+  tierColor?: string;
 }
 
 // Reorder for hexagon display (clockwise from top)
@@ -30,9 +30,12 @@ export const HexagonRadar = memo(function HexagonRadar({
   animated = true,
   tierColor,
 }: HexagonRadarProps) {
-  const center = size / 2;
-  const radius = size * 0.42;
-  const labelRadius = size * 0.54;
+  // Add padding for labels
+  const padding = showLabels ? size * 0.18 : 0;
+  const totalSize = size + padding * 2;
+  const center = totalSize / 2;
+  const radius = size * 0.32;
+  const labelRadius = size * 0.46;
 
   // Calculate hexagon points
   const hexagonPoints = useMemo(() => {
@@ -88,19 +91,24 @@ export const HexagonRadar = memo(function HexagonRadar({
     });
   }, [center, radius]);
 
+  // Font sizes based on total size
+  const labelFontSize = Math.max(10, Math.min(14, totalSize / 30));
+  const valueFontSize = Math.max(13, Math.min(18, totalSize / 22));
+
   return (
     <svg
-      width={size}
-      height={size}
-      viewBox={`0 0 ${size} ${size}`}
+      width={totalSize}
+      height={totalSize}
+      viewBox={`0 0 ${totalSize} ${totalSize}`}
       className={`${className} ${animated ? 'radar-chart' : ''}`}
+      style={{ overflow: 'visible' }}
     >
       {/* Background hexagon */}
       <path
         d={hexagonPath}
         fill="rgba(255,255,255,0.03)"
-        stroke="rgba(255,255,255,0.1)"
-        strokeWidth="1"
+        stroke="rgba(255,255,255,0.15)"
+        strokeWidth="1.5"
       />
 
       {/* Grid lines */}
@@ -111,9 +119,9 @@ export const HexagonRadar = memo(function HexagonRadar({
             `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`
           ).join(' ') + ' Z'}
           fill="none"
-          stroke="rgba(255,255,255,0.05)"
+          stroke="rgba(255,255,255,0.08)"
           strokeWidth="1"
-          strokeDasharray="2,2"
+          strokeDasharray="3,3"
         />
       ))}
 
@@ -125,7 +133,7 @@ export const HexagonRadar = memo(function HexagonRadar({
           y1={center}
           x2={point.x}
           y2={point.y}
-          stroke="rgba(255,255,255,0.08)"
+          stroke="rgba(255,255,255,0.1)"
           strokeWidth="1"
         />
       ))}
@@ -146,7 +154,7 @@ export const HexagonRadar = memo(function HexagonRadar({
           key={`point-${i}`}
           cx={point.x}
           cy={point.y}
-          r={size >= 280 ? 5 : 4}
+          r={totalSize >= 400 ? 6 : 5}
           fill={tierColor ?? "#6366F1"}
           stroke="#fff"
           strokeWidth="2"
@@ -156,19 +164,34 @@ export const HexagonRadar = memo(function HexagonRadar({
       {/* Labels */}
       {showLabels && labelPositions.map((pos, i) => (
         <g key={`label-${i}`}>
+          {/* Label background for better visibility */}
           <text
             x={pos.x}
             y={pos.y - 8}
             textAnchor="middle"
-            className="fill-text-secondary text-[10px] font-semibold tracking-wider uppercase"
+            dominantBaseline="middle"
+            fill="#71717a"
+            fontSize={labelFontSize}
+            fontWeight="700"
+            letterSpacing="0.08em"
+            style={{
+              textTransform: 'uppercase',
+              fontFamily: 'system-ui, -apple-system, sans-serif'
+            }}
           >
             {pos.label.name}
           </text>
           <text
             x={pos.x}
-            y={pos.y + 8}
+            y={pos.y + 12}
             textAnchor="middle"
-            className="fill-text-primary text-[13px] font-bold"
+            dominantBaseline="middle"
+            fill="#ffffff"
+            fontSize={valueFontSize}
+            fontWeight="800"
+            style={{
+              fontFamily: 'system-ui, -apple-system, sans-serif'
+            }}
           >
             {pos.value}
           </text>
@@ -178,8 +201,8 @@ export const HexagonRadar = memo(function HexagonRadar({
       {/* Gradient and filter definitions */}
       <defs>
         <linearGradient id="radarGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="rgba(99, 102, 241, 0.35)" />
-          <stop offset="100%" stopColor="rgba(79, 70, 229, 0.35)" />
+          <stop offset="0%" stopColor="rgba(99, 102, 241, 0.4)" />
+          <stop offset="100%" stopColor="rgba(79, 70, 229, 0.4)" />
         </linearGradient>
         {tierColor && (
           <filter id="tierGlow" x="-50%" y="-50%" width="200%" height="200%">

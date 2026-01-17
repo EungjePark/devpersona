@@ -46,7 +46,59 @@ interface ExtendedTopUser {
   topLanguage?: string;
 }
 
-// Internal action: Update leaderboard snapshot (called by cron)
+// Internal action: Update leaderboard snapshot WITH auto-seed (called by cron)
+// If analyses count < 10, automatically seed the database first
+export const updateLeaderboardSnapshotWithAutoSeed = internalAction({
+  handler: async (ctx: ActionCtx) => {
+    // 1. Check analyses count
+    const all = await ctx.runQuery(internal.analyses.getAll);
+
+    // 2. Auto-seed if below threshold
+    if (all.length < 10) {
+      console.log(`[AutoSeed] Only ${all.length} analyses found, triggering quickSeed...`);
+      await ctx.runAction(internal.seed.internalQuickSeed);
+      console.log(`[AutoSeed] Seed complete, fetching updated analyses...`);
+    }
+
+    // 3. Re-fetch after potential seed
+    const analyses = all.length < 10
+      ? await ctx.runQuery(internal.analyses.getAll)
+      : all;
+
+    if (analyses.length === 0) {
+      console.log('[AutoSeed] No analyses after seed, skipping snapshot update');
+      return;
+    }
+
+    // 4. Sort by rating and extract top 50
+    const sorted = [...analyses].sort((a, b) => b.overallRating - a.overallRating);
+    const topUsers: ExtendedTopUser[] = sorted.slice(0, 50).map((a) => ({
+      username: a.username,
+      avatarUrl: a.avatarUrl,
+      overallRating: a.overallRating,
+      tier: a.tier,
+      archetypeId: a.archetypeId,
+      totalStars: a.totalStars,
+      followers: a.followers,
+      topLanguage: a.topLanguage,
+    }));
+
+    // 5. Calculate distribution
+    const distribution = calculateDistribution(analyses);
+
+    // 6. Upsert snapshot
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await ctx.runMutation(internal.stats.upsertSnapshot as any, {
+      topUsers,
+      distribution,
+      totalUsers: analyses.length,
+    });
+
+    console.log(`[AutoSeed] Leaderboard updated with ${analyses.length} users`);
+  },
+});
+
+// Internal action: Update leaderboard snapshot (called by cron) - legacy
 export const updateLeaderboardSnapshot = internalAction({
   handler: async (ctx: ActionCtx) => {
     // 1. Fetch all analyses

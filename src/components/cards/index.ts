@@ -10,3 +10,4 @@ export { NpmCard, HNCard, LanguagesCard, PatternCard, RoastCard } from './BentoC
 export { GlobalRanking } from './GlobalRanking';
 export { AwesomePotential } from './AwesomePotential';
 export { SceneStellerGallery } from './SceneStellerGallery';
+export { SceneStellerAvatar } from './SceneStellerAvatar';

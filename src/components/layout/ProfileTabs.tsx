@@ -3,7 +3,7 @@
 import { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
-export type TabId = 'overview' | 'career' | 'analytics' | 'compete';
+export type TabId = 'overview' | 'career' | 'analytics' | 'badges' | 'compete';
 
 export interface Tab {
   id: TabId;
@@ -15,6 +15,7 @@ export const TABS: Tab[] = [
   { id: 'overview', label: 'Overview', icon: '🏠' },
   { id: 'career', label: 'Career', icon: '📊' },
   { id: 'analytics', label: 'Analytics', icon: '🔬' },
+  { id: 'badges', label: 'Badges', icon: '🏅' },
   { id: 'compete', label: 'Compete', icon: '⚔️' },
 ];
 
@@ -82,7 +83,7 @@ export function TabPanel({ tabId, activeTab, children }: TabPanelProps) {
   if (tabId !== activeTab) return null;
 
   return (
-    <div className="animate-fade-in-up">
+    <div>
       {children}
     </div>
   );

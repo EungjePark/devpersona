@@ -49,25 +49,26 @@ export default function Home() {
 
         {/* Main Content */}
         <div className="max-w-7xl mx-auto px-4 py-16 md:py-24 relative z-10">
-          {/* Hero Header - Centered */}
+          {/* Hero Header - Provocative */}
           <div className="text-center mb-16 animate-fade-in-up">
-            <div className="inline-flex items-center gap-2 mb-8 px-4 py-1.5 rounded-full bg-white/[0.03] border border-white/[0.08] backdrop-blur-sm shadow-xl">
+            <div className="inline-flex items-center gap-2 mb-8 px-4 py-1.5 rounded-full bg-red-500/10 border border-red-500/20 backdrop-blur-sm shadow-xl">
               <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
               </span>
-              <span className="text-xs font-semibold text-text-secondary tracking-wide uppercase">
-                GitHub Intelligence Engine
+              <span className="text-xs font-semibold text-red-400 tracking-wide uppercase">
+                Warning: Brutal Honesty Ahead
               </span>
             </div>
 
             <h1 className="text-6xl md:text-8xl font-black mb-8 tracking-tighter text-text-primary leading-[0.9]">
-              Decode your <br className="hidden md:block" />
-              <span className="text-gradient-primary">Developer DNA.</span>
+              Are you actually <br className="hidden md:block" />
+              <span className="text-gradient-primary">a good developer?</span>
             </h1>
 
             <p className="text-lg md:text-xl text-text-muted max-w-2xl mx-auto leading-relaxed text-balance font-normal">
-              Your code tells a story. We analyze your commit history and impact to uncover your true <span className="text-text-primary font-medium">engineering archetype</span>.
+              Stop lying to yourself. Your GitHub doesn&apos;t lie. <br className="hidden md:block" />
+              We expose your <span className="text-red-400 font-bold">real</span> impact, consistency, and influence.
             </p>
           </div>
 
@@ -178,13 +179,13 @@ export default function Home() {
                   </div>
                 </div>
 
-                {/* Hexagon Chart */}
+                {/* Hexagon Chart - Bigger */}
                 <div className="flex justify-center mb-6">
                   <HexagonRadar
                     signals={DEMO_SIGNALS}
-                    size={280}
+                    size={340}
                     showLabels={true}
-                    tierColor="#d97706" // Legendary Gold
+                    tierColor="#d97706"
                   />
                 </div>
 
@@ -214,10 +215,10 @@ export default function Home() {
           <div className="mt-24 animate-fade-in-up delay-300">
             <div className="text-center mb-8">
               <h2 className="text-2xl md:text-3xl font-bold text-text-primary mb-3">
-                Top <span className="text-gradient-primary">Developers</span>
+                The <span className="text-gradient-primary">Elite 0.1%</span>
               </h2>
               <p className="text-text-secondary">
-                See how you stack up against the best
+                Can you even get on this list?
               </p>
             </div>
             <div className="max-w-2xl mx-auto">

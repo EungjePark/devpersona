@@ -16,6 +16,7 @@ import {
   getLanguageColor,
   tooltipStyle,
   CHART_ANIMATION,
+  ChartContainer,
 } from '@/lib/chart-config';
 
 // Rough estimate: average lines of code per contribution
@@ -101,8 +102,8 @@ function LanguagePieChart({ languages }: { languages: LanguageData[] }) {
   );
 
   return (
-    <div className="h-48 min-w-[150px]">
-      <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
+    <ChartContainer className="h-48 min-w-[150px]">
+      <ResponsiveContainer width="100%" height="100%" minWidth={150} minHeight={100} debounce={50}>
         <PieChart>
           <Pie
             data={pieData}
@@ -122,7 +123,7 @@ function LanguagePieChart({ languages }: { languages: LanguageData[] }) {
           <Legend content={<CustomLegend />} />
         </PieChart>
       </ResponsiveContainer>
-    </div>
+    </ChartContainer>
   );
 }
 

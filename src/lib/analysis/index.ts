@@ -1,14 +1,14 @@
 // Main Analysis Orchestrator
-// Combines GitHub, npm, and HN data to generate a complete profile
+// Combines GitHub, npm data to generate a complete profile
 
-import type { AnalysisResult, SignalScores, URLState } from '../types';
+import type { AnalysisResult, SignalScores, URLState, CommunityMetrics } from '../types';
 import { TIERS } from '../types';
-import { fetchAllGitHubData } from '../github/client';
+import { fetchAllGitHubData, fetchCommunityMetrics } from '../github/client';
 import { fetchNpmData } from '../npm/client';
-import { fetchHNStats } from '../hackernews/client';
 import { calculateAllSignals, calculateOverallRating } from './signals';
 import { ARCHETYPES, matchArchetype } from './archetypes';
 import { PATTERNS, detectActivityPattern, getLanguageDistribution, getTierFromRating } from './patterns';
+import { calculateAchievements } from '../achievements';
 
 export * from './signals';
 export * from './archetypes';
@@ -26,19 +26,23 @@ export async function analyzeUser(
   username: string,
   options: AnalyzeOptions = {}
 ): Promise<AnalysisResult> {
-  // Fetch all data in parallel
-  const [githubData, npmPackages, hnStats] = await Promise.all([
+  // Fetch GitHub and npm data in parallel
+  const [githubData, npmPackages] = await Promise.all([
     fetchAllGitHubData(username, { token: options.githubToken }),
     fetchNpmData(username).catch(() => []),
-    fetchHNStats(username).catch(() => ({
-      totalPoints: 0,
-      totalComments: 0,
-      totalStories: 0,
-      topPost: null,
-    })),
   ]);
 
   const { user, repos, commits, contributions } = githubData;
+
+  // Fetch community metrics (needs repos data first)
+  const communityMetrics = await fetchCommunityMetrics(username, repos, { token: options.githubToken }).catch(
+    (): CommunityMetrics => ({
+      externalPRs: 0,
+      prsReceived: 0,
+      issuesReceived: 0,
+      uniqueContributors: 0,
+    })
+  );
 
   // Calculate signals
   const signals = calculateAllSignals(
@@ -46,15 +50,8 @@ export async function analyzeUser(
     repos,
     user.followers,
     npmPackages,
-    [] // HN items not needed for signal calculation - using stats instead
+    communityMetrics
   );
-
-  // Adjust VOICE signal with HN stats
-  if (hnStats.totalPoints > 0 || hnStats.totalComments > 0) {
-    const combined = hnStats.totalPoints + (hnStats.totalComments * 0.5);
-    const logScore = Math.log10(combined + 1);
-    signals.voice = Math.min(100, Math.round(20 + (logScore * 20)));
-  }
 
   // Boost GRIT signal with contribution streak data
   if (contributions) {
@@ -89,6 +86,23 @@ export async function analyzeUser(
       description: repo.description ?? undefined,
     }));
 
+  // Calculate achievements
+  const achievements = contributions
+    ? calculateAchievements(contributions, {
+        languages,
+        totalStars,
+        maxRepoStars: repos.length > 0 ? Math.max(...repos.map(r => r.stargazers_count)) : 0,
+        followers: user.followers,
+        prCount: communityMetrics.prsReceived + communityMetrics.externalPRs,
+        activeRepos: repos.filter(r => !r.archived).length,
+        totalRepos: repoCount,
+        npmPackages: npmPackages.length,
+        npmWeeklyDownloads: npmPackages.reduce((sum, p) => sum + p.downloads, 0),
+        externalPRs: communityMetrics.externalPRs,
+        signals,
+      })
+    : [];
+
   return {
     username: user.login,
     avatarUrl: user.avatar_url,
@@ -101,12 +115,11 @@ export async function analyzeUser(
     pattern,
     languages,
     npmPackages,
-    hnStats: {
-      points: hnStats.totalPoints,
-      comments: hnStats.totalComments,
-      topPost: hnStats.topPost?.title,
-    },
+    communityMetrics,
     contributions,
+    repos,
+    followers: user.followers,
+    achievements,
     totalStars,
     totalForks,
     repoCount,

@@ -19,6 +19,7 @@ import {
   tooltipStyle,
   CHART_ANIMATION,
   CHART_MARGINS,
+  ChartContainer,
 } from '@/lib/chart-config';
 
 interface TrendAnalysisProps {
@@ -116,7 +117,7 @@ export const TrendAnalysis = memo(function TrendAnalysis({
   const bestMonth = useMemo(() => {
     return monthlyData.reduce((best, current) =>
       current.count > best.count ? current : best
-    , monthlyData[0] || { name: '-', count: 0, year: '', fullLabel: '-' });
+      , monthlyData[0] || { name: '-', count: 0, year: '', fullLabel: '-' });
   }, [monthlyData]);
 
   // Area fill gradient ID
@@ -126,11 +127,10 @@ export const TrendAnalysis = memo(function TrendAnalysis({
     <div className="space-y-6">
       {/* Trend indicator */}
       {trend && (
-        <div className={`p-4 rounded-xl ${
-          trend.direction === 'up'
-            ? 'bg-green-500/10 border border-green-500/20'
-            : 'bg-red-500/10 border border-red-500/20'
-        }`}>
+        <div className={`p-4 rounded-xl ${trend.direction === 'up'
+          ? 'bg-green-500/10 border border-green-500/20'
+          : 'bg-red-500/10 border border-red-500/20'
+          }`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="text-2xl">{trend.direction === 'up' ? '📈' : '📉'}</span>
@@ -143,9 +143,8 @@ export const TrendAnalysis = memo(function TrendAnalysis({
                 </div>
               </div>
             </div>
-            <div className={`text-xl font-bold ${
-              trend.direction === 'up' ? 'text-green-400' : 'text-red-400'
-            }`}>
+            <div className={`text-xl font-bold ${trend.direction === 'up' ? 'text-green-400' : 'text-red-400'
+              }`}>
               {trend.direction === 'up' ? '+' : '-'}{trend.percentage}%
             </div>
           </div>
@@ -156,8 +155,8 @@ export const TrendAnalysis = memo(function TrendAnalysis({
       <div className="space-y-2">
         <h4 className="text-xs text-text-muted uppercase tracking-wider">Monthly Contributions</h4>
 
-        <div className="h-44 min-w-[200px]">
-          <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
+        <ChartContainer className="h-48 min-w-[200px]">
+          <ResponsiveContainer width="100%" height="100%" minWidth={200} minHeight={100} debounce={50}>
             <ComposedChart
               data={monthlyData}
               margin={CHART_MARGINS.withAxis}
@@ -223,7 +222,7 @@ export const TrendAnalysis = memo(function TrendAnalysis({
               />
             </ComposedChart>
           </ResponsiveContainer>
-        </div>
+        </ChartContainer>
       </div>
 
       {/* Stats grid */}

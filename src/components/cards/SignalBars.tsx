@@ -13,7 +13,7 @@ import {
 import { SIGNAL_LABELS, SIGNAL_ORDER, STAT_GRADES, type SignalScores, type StatGrade } from '@/lib/types';
 import { GRADE_DESCRIPTIONS } from '@/lib/format';
 import { cn } from '@/lib/utils';
-import { CHART_THEME, tooltipStyle, CHART_ANIMATION } from '@/lib/chart-config';
+import { CHART_THEME, tooltipStyle, CHART_ANIMATION, ChartContainer } from '@/lib/chart-config';
 
 interface SignalBarsProps {
   signals: SignalScores;
@@ -22,6 +22,7 @@ interface SignalBarsProps {
   compact?: boolean;
   tierColor?: string;
   allowToggle?: boolean;
+  onSignalClick?: (signal: keyof SignalScores) => void;
 }
 
 // Grade colors using CSS variables for consistency
@@ -108,8 +109,8 @@ function SignalRadarChart({
   );
 
   return (
-    <div className="h-64 min-w-[200px]">
-      <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
+    <ChartContainer className="h-64 min-w-[200px]">
+      <ResponsiveContainer width="100%" height="100%">
         <RadarChart data={radarData} cx="50%" cy="50%" outerRadius="80%">
           <PolarGrid stroke={CHART_THEME.grid} />
           <PolarAngleAxis
@@ -134,7 +135,7 @@ function SignalRadarChart({
           />
         </RadarChart>
       </ResponsiveContainer>
-    </div>
+    </ChartContainer>
   );
 }
 
@@ -143,10 +144,12 @@ function SignalBarList({
   signals,
   showGrade,
   compact,
+  onSignalClick,
 }: {
   signals: SignalScores;
   showGrade: boolean;
   compact: boolean;
+  onSignalClick?: (signal: keyof SignalScores) => void;
 }) {
   return (
     <div className="space-y-3">
@@ -154,9 +157,21 @@ function SignalBarList({
         const label = SIGNAL_LABELS[key];
         const value = signals[key];
         const { grade, colorHex } = getGrade(value);
+        const isClickable = !!onSignalClick;
 
         return (
-          <div key={key} className={cn('group', compact ? 'space-y-1' : 'space-y-1.5')}>
+          <div
+            key={key}
+            className={cn(
+              'group',
+              compact ? 'space-y-1' : 'space-y-1.5',
+              isClickable && 'cursor-pointer hover:bg-white/[0.02] -mx-2 px-2 py-1 rounded-lg transition-colors'
+            )}
+            onClick={isClickable ? () => onSignalClick(key) : undefined}
+            role={isClickable ? 'button' : undefined}
+            tabIndex={isClickable ? 0 : undefined}
+            onKeyDown={isClickable ? (e) => e.key === 'Enter' && onSignalClick(key) : undefined}
+          >
             {/* Label row */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -167,6 +182,11 @@ function SignalBarList({
                 )}>
                   {label.name}
                 </span>
+                {isClickable && (
+                  <span className="text-[10px] text-zinc-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                    Click for details
+                  </span>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 {showGrade && (
@@ -228,6 +248,7 @@ export const SignalBars = memo(function SignalBars({
   compact = false,
   tierColor = '#6366f1',
   allowToggle = false,
+  onSignalClick,
 }: SignalBarsProps) {
   const [viewMode, setViewMode] = useState<'bars' | 'radar'>('bars');
 
@@ -265,7 +286,7 @@ export const SignalBars = memo(function SignalBars({
       {viewMode === 'radar' && allowToggle ? (
         <SignalRadarChart signals={signals} tierColor={tierColor} />
       ) : (
-        <SignalBarList signals={signals} showGrade={showGrade} compact={compact} />
+        <SignalBarList signals={signals} showGrade={showGrade} compact={compact} onSignalClick={onSignalClick} />
       )}
     </div>
   );

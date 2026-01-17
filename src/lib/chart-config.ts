@@ -5,6 +5,7 @@
  * Provides consistent styling across all chart components
  */
 
+import { useSyncExternalStore, createElement, type ReactNode } from 'react';
 import type { TierLevel } from './types';
 
 // Chart theme colors aligned with DevPersona design system
@@ -156,3 +157,35 @@ export const CHART_BREAKPOINTS = {
   md: 640,
   lg: 1024,
 };
+
+/**
+ * ChartContainer - Wrapper that prevents Recharts ResponsiveContainer warnings
+ *
+ * Delays rendering until after mount when DOM dimensions are available.
+ * This prevents the "width(-1) and height(-1)" console warnings that occur
+ * when ResponsiveContainer tries to measure its parent before CSS layout completes.
+ */
+interface ChartContainerProps {
+  children: ReactNode;
+  className?: string;
+}
+
+// SSR-safe mount detection using useSyncExternalStore
+const emptySubscribe = () => () => {};
+const getClientSnapshot = () => true;
+const getServerSnapshot = () => false;
+
+export function ChartContainer({ children, className }: ChartContainerProps) {
+  const isMounted = useSyncExternalStore(
+    emptySubscribe,
+    getClientSnapshot,
+    getServerSnapshot
+  );
+
+  if (!isMounted) {
+    // Return empty container with same dimensions to prevent layout shift
+    return createElement('div', { className });
+  }
+
+  return createElement('div', { className }, children);
+}

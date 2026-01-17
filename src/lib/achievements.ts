@@ -3,7 +3,7 @@
  * Inspired by GitHub Achievements, Steam, and sports games
  */
 
-import type { ContributionStats } from './types';
+import type { ContributionStats, SignalScores } from './types';
 
 export type AchievementCategory =
   | 'streak'
@@ -14,7 +14,8 @@ export type AchievementCategory =
   | 'social'
   | 'opensource'
   | 'npm'
-  | 'hackernews'
+  | 'community'
+  | 'milestone'
   | 'secret';
 
 export interface Achievement {
@@ -379,33 +380,53 @@ const ACHIEVEMENT_DEFINITIONS = {
     threshold: 1000000,
   },
 
-  // Hacker News
-  hnPoster: {
-    id: 'hnPoster',
-    name: 'HN Poster',
-    description: 'Have content featured on Hacker News',
-    icon: '📰',
+  // Community / Open Source Collaboration
+  communityContributor: {
+    id: 'communityContributor',
+    name: 'Contributor',
+    description: 'Made at least 1 PR to another project',
+    icon: '🤝',
     tier: 'bronze' as const,
-    category: 'hackernews' as const,
+    category: 'community' as const,
     threshold: 1,
   },
-  hnTrending: {
-    id: 'hnTrending',
-    name: 'HN Trending',
-    description: 'Get 100+ points on a HN post',
-    icon: '📢',
+  communityActive: {
+    id: 'communityActive',
+    name: 'Active Contributor',
+    description: 'Made 10+ PRs to other projects',
+    icon: '🔄',
     tier: 'silver' as const,
-    category: 'hackernews' as const,
+    category: 'community' as const,
+    threshold: 10,
+  },
+  openSourceHero: {
+    id: 'openSourceHero',
+    name: 'Open Source Hero',
+    description: 'Made 100+ PRs to other projects',
+    icon: '🦸',
+    tier: 'platinum' as const,
+    category: 'community' as const,
     threshold: 100,
   },
-  hnFrontpage: {
-    id: 'hnFrontpage',
-    name: 'Frontpage Hero',
-    description: 'Get 500+ points on a HN post',
-    icon: '🏆',
+
+  // Signal-based achievements
+  balancedDeveloper: {
+    id: 'balancedDeveloper',
+    name: 'Balanced Dev',
+    description: 'All signal scores above 70',
+    icon: '⚖️',
     tier: 'gold' as const,
-    category: 'hackernews' as const,
-    threshold: 500,
+    category: 'milestone' as const,
+    threshold: 70,
+  },
+  consistencyKing: {
+    id: 'consistencyKing',
+    name: 'Consistency King',
+    description: 'GRIND score above 90',
+    icon: '👑',
+    tier: 'platinum' as const,
+    category: 'milestone' as const,
+    threshold: 90,
   },
 
   // Secret/Easter Egg
@@ -536,8 +557,9 @@ export interface ExtendedStats {
   npmPackages?: number;
   awesomeCategoryCount?: number; // Number of categories matching awesome lists
   npmWeeklyDownloads?: number;
-  hnPoints?: number;
+  externalPRs?: number; // PRs to other people's repos (community engagement)
   hasDependents?: boolean;
+  signals?: SignalScores; // Signal scores for milestone achievements
 }
 
 /**
@@ -830,31 +852,31 @@ export function calculateAchievements(
     progress: Math.min(100, (npmWeeklyDownloads / 1000000) * 100),
   });
 
-  // Hacker News
-  const hnPoints = extended?.hnPoints ?? 0;
+  // Community / Open Source Collaboration
+  const externalPRs = extended?.externalPRs ?? 0;
 
   achievements.push({
-    ...ACHIEVEMENT_DEFINITIONS.hnPoster,
-    unlocked: hnPoints >= 1,
-    currentValue: hnPoints,
+    ...ACHIEVEMENT_DEFINITIONS.communityContributor,
+    unlocked: externalPRs >= 1,
+    currentValue: externalPRs,
     maxValue: 1,
-    progress: hnPoints >= 1 ? 100 : 0,
+    progress: externalPRs >= 1 ? 100 : 0,
   });
 
   achievements.push({
-    ...ACHIEVEMENT_DEFINITIONS.hnTrending,
-    unlocked: hnPoints >= 100,
-    currentValue: hnPoints,
+    ...ACHIEVEMENT_DEFINITIONS.communityActive,
+    unlocked: externalPRs >= 10,
+    currentValue: externalPRs,
+    maxValue: 10,
+    progress: Math.min(100, (externalPRs / 10) * 100),
+  });
+
+  achievements.push({
+    ...ACHIEVEMENT_DEFINITIONS.openSourceHero,
+    unlocked: externalPRs >= 100,
+    currentValue: externalPRs,
     maxValue: 100,
-    progress: Math.min(100, (hnPoints / 100) * 100),
-  });
-
-  achievements.push({
-    ...ACHIEVEMENT_DEFINITIONS.hnFrontpage,
-    unlocked: hnPoints >= 500,
-    currentValue: hnPoints,
-    maxValue: 500,
-    progress: Math.min(100, (hnPoints / 500) * 100),
+    progress: Math.min(100, (externalPRs / 100) * 100),
   });
 
   // Secret/Easter Egg (based on contribution patterns)
@@ -991,6 +1013,36 @@ export function calculateAchievements(
     maxValue: 3,
     progress: Math.min(100, (awesomeCategoryCount / 3) * 100),
   });
+
+  // Milestone achievements (signal-based)
+  const signals = extended?.signals;
+  if (signals) {
+    // Balanced Developer - all signals above 70
+    const allSignals = [signals.grit, signals.focus, signals.craft, signals.impact, signals.voice, signals.reach];
+    const minSignal = Math.min(...allSignals);
+    const balancedThreshold = ACHIEVEMENT_DEFINITIONS.balancedDeveloper.threshold;
+    const isBalanced = allSignals.every(s => s >= balancedThreshold);
+
+    achievements.push({
+      ...ACHIEVEMENT_DEFINITIONS.balancedDeveloper,
+      unlocked: isBalanced,
+      currentValue: minSignal,
+      maxValue: balancedThreshold,
+      progress: isBalanced ? 100 : Math.min(100, (minSignal / balancedThreshold) * 100),
+    });
+
+    // Consistency King - GRIND score above 90
+    const consistencyThreshold = ACHIEVEMENT_DEFINITIONS.consistencyKing.threshold;
+    const isConsistencyKing = signals.grit >= consistencyThreshold;
+
+    achievements.push({
+      ...ACHIEVEMENT_DEFINITIONS.consistencyKing,
+      unlocked: isConsistencyKing,
+      currentValue: signals.grit,
+      maxValue: consistencyThreshold,
+      progress: Math.min(100, (signals.grit / consistencyThreshold) * 100),
+    });
+  }
 
   return achievements;
 }

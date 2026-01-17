@@ -1,7 +1,7 @@
 // GitHub API Client - BYOT (Bring Your Own Token)
 // Uses server-side proxy for unauthenticated requests
 
-import type { GitHubUser, GitHubRepo, GitHubCommit, ContributionCalendar, ContributionStats } from '../types';
+import type { GitHubUser, GitHubRepo, GitHubCommit, ContributionCalendar, ContributionStats, CommunityMetrics } from '../types';
 
 const GITHUB_API = 'https://api.github.com';
 const GITHUB_PROXY = '/api/github';
@@ -246,6 +246,110 @@ export async function fetchContributions(
     console.error('Failed to fetch contributions:', error);
     return null;
   }
+}
+
+/**
+ * Fetch community metrics for COMMUNITY signal
+ * Samples top 10 repos and aggregates collaboration data
+ */
+export async function fetchCommunityMetrics(
+  username: string,
+  repos: GitHubRepo[],
+  options: GitHubClientOptions = {}
+): Promise<CommunityMetrics> {
+  const apiBase = getApiBase(options.token);
+
+  // Sample top 10 repos by stars (most likely to have community engagement)
+  const topRepos = repos
+    .filter(r => !r.fork && !r.archived)
+    .sort((a, b) => b.stargazers_count - a.stargazers_count)
+    .slice(0, 10);
+
+  let prsReceived = 0;
+  let issuesReceived = 0;
+  const contributorSet = new Set<string>();
+
+  // Fetch PRs, issues, and contributors for each repo
+  for (const repo of topRepos) {
+    try {
+      // Fetch PRs (state=all to get merged PRs too)
+      const prsResponse = await fetch(
+        `${apiBase}/repos/${repo.full_name}/pulls?state=all&per_page=100`,
+        {
+          headers: getHeaders(options.token),
+          next: { revalidate: 3600 },
+        }
+      );
+      if (prsResponse.ok) {
+        const prs: { user: { login: string } }[] = await prsResponse.json();
+        // Count PRs from other users (not the repo owner)
+        const externalPRs = prs.filter(pr => pr.user.login.toLowerCase() !== username.toLowerCase());
+        prsReceived += externalPRs.length;
+      }
+
+      // Fetch issues (exclude PRs which also appear in issues endpoint)
+      const issuesResponse = await fetch(
+        `${apiBase}/repos/${repo.full_name}/issues?state=all&per_page=100`,
+        {
+          headers: getHeaders(options.token),
+          next: { revalidate: 3600 },
+        }
+      );
+      if (issuesResponse.ok) {
+        const issues: { user: { login: string }; pull_request?: unknown }[] = await issuesResponse.json();
+        // Filter out PRs (they have pull_request field) and owner's issues
+        const externalIssues = issues.filter(
+          issue => !issue.pull_request && issue.user.login.toLowerCase() !== username.toLowerCase()
+        );
+        issuesReceived += externalIssues.length;
+      }
+
+      // Fetch contributors
+      const contributorsResponse = await fetch(
+        `${apiBase}/repos/${repo.full_name}/contributors?per_page=100`,
+        {
+          headers: getHeaders(options.token),
+          next: { revalidate: 3600 },
+        }
+      );
+      if (contributorsResponse.ok) {
+        const contributors: { login: string }[] = await contributorsResponse.json();
+        contributors.forEach(c => {
+          if (c.login.toLowerCase() !== username.toLowerCase()) {
+            contributorSet.add(c.login.toLowerCase());
+          }
+        });
+      }
+    } catch {
+      // Skip failed repos
+      continue;
+    }
+  }
+
+  // Fetch external PRs (user's PRs to other repos) via search API
+  let externalPRs = 0;
+  try {
+    const searchResponse = await fetch(
+      `${apiBase}/search/issues?q=author:${username}+type:pr+-user:${username}&per_page=100`,
+      {
+        headers: getHeaders(options.token),
+        next: { revalidate: 3600 },
+      }
+    );
+    if (searchResponse.ok) {
+      const searchResult: { total_count: number } = await searchResponse.json();
+      externalPRs = searchResult.total_count;
+    }
+  } catch {
+    // Search API may fail, continue with 0
+  }
+
+  return {
+    externalPRs,
+    prsReceived,
+    issuesReceived,
+    uniqueContributors: contributorSet.size,
+  };
 }
 
 /**
