@@ -16,37 +16,70 @@ import { StreakStats, CodingPatterns, TrendAnalysis, CodeOwnership, StarSummary,
 import { PoweredBySceneSteller } from '@/components/SceneStellerBranding';
 import { ProfileTabs, TabPanel, type TabId, isValidTabId } from '@/components/layout/ProfileTabs';
 import { analyzeUser, getRandomRoast } from '@/lib/analysis';
+import { ARCHETYPES } from '@/lib/analysis/archetypes';
 import { getSignalBreakdown, type SignalBreakdown } from '@/lib/analysis/breakdowns';
 import type { SignalScores } from '@/lib/types';
 import { buildShareUrl } from '@/lib/url-state';
-import type { AnalysisResult, TierLevel } from '@/lib/types';
+import type { AnalysisResult, TierLevel, ArchetypeId } from '@/lib/types';
 import { TIER_DESIGN_TOKENS, TIERS } from '@/lib/types';
 
 interface AnalyzeClientProps {
   username: string;
 }
 
-// Loading skeleton
-function LoadingSkeleton() {
+// Loading skeleton with animated stages
+function LoadingSkeleton({ username }: { username?: string }) {
+  const [stage, setStage] = useState(0);
+  const stages = [
+    { emoji: '🔍', text: 'Fetching GitHub profile...' },
+    { emoji: '📊', text: 'Analyzing commit patterns...' },
+    { emoji: '⚡', text: 'Calculating signal scores...' },
+    { emoji: '🎯', text: 'Determining archetype...' },
+    { emoji: '🏆', text: 'Generating developer card...' },
+  ];
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setStage((s) => (s + 1) % stages.length);
+    }, 1500);
+    return () => clearInterval(timer);
+  }, [stages.length]);
+
+  const current = stages[stage];
+
   return (
-    <div className="animate-pulse w-full max-w-5xl mx-auto pt-8">
+    <div className="w-full max-w-2xl mx-auto pt-16">
       <div className="flex flex-col items-center gap-8">
-        {/* Header skeleton */}
-        <div className="flex items-center gap-6 w-full max-w-md">
-          <div className="w-20 h-20 rounded-2xl bg-white/[0.05]" />
-          <div className="flex-1 space-y-3">
-            <div className="h-6 w-32 rounded bg-white/[0.05]" />
-            <div className="h-4 w-48 rounded bg-white/[0.03]" />
+        {/* Animated loader */}
+        <div className="relative">
+          <div className="w-24 h-24 rounded-full border-4 border-white/10 border-t-primary-500 animate-spin" />
+          <div className="absolute inset-0 flex items-center justify-center text-4xl animate-pulse">
+            {current.emoji}
           </div>
         </div>
 
-        {/* Tabs skeleton */}
-        <div className="h-12 w-96 rounded-2xl bg-white/[0.03]" />
+        {/* Username */}
+        {username && (
+          <h2 className="text-2xl font-black text-white">
+            Analyzing <span className="text-primary-400">@{username}</span>
+          </h2>
+        )}
 
-        {/* Content skeleton */}
-        <div className="grid md:grid-cols-2 gap-8 w-full">
-          <div className="h-[500px] rounded-3xl bg-white/[0.02]" />
-          <div className="h-[500px] rounded-3xl bg-white/[0.02]" />
+        {/* Stage text */}
+        <p className="text-text-secondary animate-pulse text-lg">
+          {current.text}
+        </p>
+
+        {/* Progress dots */}
+        <div className="flex gap-2">
+          {stages.map((_, i) => (
+            <div
+              key={i}
+              className={`w-2 h-2 rounded-full transition-all duration-300 ${
+                i === stage ? 'bg-primary-500 scale-125' : 'bg-white/20'
+              }`}
+            />
+          ))}
         </div>
       </div>
     </div>
@@ -170,6 +203,7 @@ export default function AnalyzeClient({ username }: AnalyzeClientProps) {
   const saveAnalysis = useMutation(api.analyses.saveAnalysis);
   const refreshLeaderboard = useAction(api.stats.refreshLeaderboard);
   const leaderboardSnapshot = useQuery(api.analyses.getLeaderboardSnapshot);
+  const cachedAnalysis = useQuery(api.analyses.getByUsername, { username });
   const userRank = useQuery(
     api.analyses.getUserRank,
     result ? { rating: result.overallRating } : 'skip'
@@ -210,9 +244,69 @@ export default function AnalyzeClient({ username }: AnalyzeClientProps) {
     }
   }, [username, saveAnalysis, refreshLeaderboard]);
 
+  // Use cached data if available and recent (< 24 hours)
   useEffect(() => {
-    runAnalysis();
-  }, [runAnalysis]);
+    if (cachedAnalysis && !result) {
+      const ageMs = Date.now() - cachedAnalysis.analyzedAt;
+      const isRecent = ageMs < 24 * 60 * 60 * 1000; // 24 hours
+
+      if (isRecent) {
+        // Build result from cached data
+        const tier = cachedAnalysis.tier as TierLevel;
+        const tierInfo = TIERS[tier];
+        const archetypeId = cachedAnalysis.archetypeId as ArchetypeId;
+        const archetype = ARCHETYPES[archetypeId] || ARCHETYPES.maintainer;
+
+        setResult({
+          username: cachedAnalysis.username,
+          avatarUrl: cachedAnalysis.avatarUrl,
+          name: cachedAnalysis.name ?? null,
+          bio: null,
+          followers: cachedAnalysis.followers ?? 0,
+          totalStars: cachedAnalysis.totalStars ?? 0,
+          signals: {
+            grit: cachedAnalysis.grit,
+            focus: cachedAnalysis.focus,
+            craft: cachedAnalysis.craft,
+            impact: cachedAnalysis.impact,
+            voice: cachedAnalysis.voice,
+            reach: cachedAnalysis.reach,
+          },
+          overallRating: cachedAnalysis.overallRating,
+          tier: tierInfo,
+          archetype,
+          pattern: { type: 'balanced', name: 'Balanced', emoji: '⚖️', description: 'A balanced coding schedule' },
+          languages: [],
+          repos: [],
+          npmPackages: [],
+          contributions: null,
+          communityMetrics: undefined,
+          analyzedAt: new Date(cachedAnalysis.analyzedAt).toISOString(),
+        });
+        setRoast(getRandomRoast(archetype));
+        setIsLoading(false);
+        return;
+      }
+    }
+  }, [cachedAnalysis, result]);
+
+  // Only run fresh analysis if no cached data or cache is stale
+  useEffect(() => {
+    // Wait for Convex query to resolve
+    if (cachedAnalysis === undefined) return; // Still loading
+
+    if (cachedAnalysis === null) {
+      // No cached data - run fresh analysis
+      runAnalysis();
+    } else {
+      const ageMs = Date.now() - cachedAnalysis.analyzedAt;
+      const isStale = ageMs >= 24 * 60 * 60 * 1000; // 24 hours
+
+      if (isStale) {
+        runAnalysis();
+      }
+    }
+  }, [cachedAnalysis, runAnalysis]);
 
   const handleReroll = useCallback(() => {
     if (result) {
@@ -314,7 +408,7 @@ ${shareUrl}`;
 
       {/* Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-10">
-        {isLoading && <LoadingSkeleton />}
+        {isLoading && <LoadingSkeleton username={username} />}
 
         {error && <ErrorState error={error} onRetry={runAnalysis} />}
 
