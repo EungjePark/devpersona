@@ -1,6 +1,7 @@
 'use client';
 
-import { memo, useMemo } from 'react';
+import { memo, useMemo, useCallback } from 'react';
+import { LANGUAGE_COLORS } from '@/lib/chart-config';
 
 interface LanguageData {
   name: string;
@@ -11,29 +12,6 @@ interface LanguageEvolutionProps {
   languages: LanguageData[];
   tierColor: string;
 }
-
-// Language color mapping
-const LANGUAGE_COLORS: Record<string, string> = {
-  JavaScript: '#f7df1e',
-  TypeScript: '#3178c6',
-  Python: '#3776ab',
-  Java: '#b07219',
-  Go: '#00add8',
-  Rust: '#dea584',
-  Ruby: '#cc342d',
-  PHP: '#777bb4',
-  'C++': '#f34b7d',
-  C: '#555555',
-  'C#': '#178600',
-  Swift: '#fa7343',
-  Kotlin: '#a97bff',
-  Dart: '#00b4ab',
-  Shell: '#89e051',
-  HTML: '#e34c26',
-  CSS: '#563d7c',
-  Vue: '#4fc08d',
-  Svelte: '#ff3e00',
-};
 
 export const LanguageEvolution = memo(function LanguageEvolution({
   languages,
@@ -46,6 +24,11 @@ export const LanguageEvolution = memo(function LanguageEvolution({
   const totalPercentage = useMemo(() => {
     return topLanguages.reduce((sum, lang) => sum + lang.percentage, 0);
   }, [topLanguages]);
+
+  // Use tierColor as fallback instead of default gray
+  const getLangColor = useCallback((langName: string) => {
+    return LANGUAGE_COLORS[langName] || tierColor;
+  }, [tierColor]);
 
   if (languages.length === 0) {
     return (
@@ -61,7 +44,7 @@ export const LanguageEvolution = memo(function LanguageEvolution({
       <div className="space-y-2">
         <div className="h-8 flex rounded-xl overflow-hidden">
           {topLanguages.map((lang) => {
-            const color = LANGUAGE_COLORS[lang.name] || tierColor;
+            const color = getLangColor(lang.name);
             const width = (lang.percentage / totalPercentage) * 100;
 
             return (
@@ -85,7 +68,7 @@ export const LanguageEvolution = memo(function LanguageEvolution({
         {/* Legend */}
         <div className="flex flex-wrap gap-3 mt-4">
           {topLanguages.map((lang) => {
-            const color = LANGUAGE_COLORS[lang.name] || tierColor;
+            const color = getLangColor(lang.name);
             return (
               <div key={lang.name} className="flex items-center gap-1.5">
                 <div
@@ -103,7 +86,7 @@ export const LanguageEvolution = memo(function LanguageEvolution({
       {/* Language breakdown bars */}
       <div className="space-y-3">
         {topLanguages.map((lang, index) => {
-          const color = LANGUAGE_COLORS[lang.name] || tierColor;
+          const color = getLangColor(lang.name);
           const rankEmoji = ['🥇', '🥈', '🥉'][index] || `${index + 1}.`;
 
           return (
@@ -135,7 +118,7 @@ export const LanguageEvolution = memo(function LanguageEvolution({
           <span className="text-text-muted text-sm">Primary Language:</span>
           <span
             className="font-bold text-lg"
-            style={{ color: LANGUAGE_COLORS[topLanguages[0].name] || tierColor }}
+            style={{ color: getLangColor(topLanguages[0].name) }}
           >
             {topLanguages[0].name}
           </span>

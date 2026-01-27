@@ -2,26 +2,14 @@
 
 import { memo } from 'react';
 import type { TrendingRepo } from '@/lib/trends/types';
-
-// Language colors
-const LANGUAGE_COLORS: Record<string, string> = {
-  TypeScript: '#3178c6',
-  Python: '#3572A5',
-  JavaScript: '#f1e05a',
-  Rust: '#dea584',
-  Go: '#00ADD8',
-  Zig: '#ec915c',
-};
+import { getLanguageColor } from '@/lib/chart-config';
+import { formatNumber } from './utils';
 
 interface RepoRankingsProps {
   repos: TrendingRepo[];
 }
 
 export const RepoRankings = memo(function RepoRankings({ repos }: RepoRankingsProps) {
-  const formatNumber = (num: number) => {
-    if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
-    return num.toString();
-  };
 
   return (
     <div className="space-y-6">
@@ -63,18 +51,21 @@ export const RepoRankings = memo(function RepoRankings({ repos }: RepoRankingsPr
                   <span className="text-white font-semibold group-hover:text-purple-400 transition-colors">
                     {repo.fullName}
                   </span>
-                  {repo.language && (
-                    <span
-                      className="text-xs px-2 py-0.5 rounded-full border"
-                      style={{
-                        backgroundColor: `${LANGUAGE_COLORS[repo.language] || '#666'}15`,
-                        borderColor: `${LANGUAGE_COLORS[repo.language] || '#666'}40`,
-                        color: LANGUAGE_COLORS[repo.language] || '#888',
-                      }}
-                    >
-                      {repo.language}
-                    </span>
-                  )}
+                  {repo.language && (() => {
+                    const langColor = getLanguageColor(repo.language);
+                    return (
+                      <span
+                        className="text-xs px-2 py-0.5 rounded-full border"
+                        style={{
+                          backgroundColor: `${langColor}15`,
+                          borderColor: `${langColor}40`,
+                          color: langColor,
+                        }}
+                      >
+                        {repo.language}
+                      </span>
+                    );
+                  })()}
                 </div>
 
                 {/* Description */}

@@ -81,6 +81,7 @@ export const GRADE_CHART_COLORS = {
 } as const;
 
 // Language colors for code ownership charts
+// Consolidated - use this as the single source of truth
 export const LANGUAGE_COLORS: Record<string, string> = {
   TypeScript: '#3178c6',
   JavaScript: '#f7df1e',
@@ -98,11 +99,13 @@ export const LANGUAGE_COLORS: Record<string, string> = {
   Scala: '#dc322f',
   Dart: '#00b4ab',
   Vue: '#41b883',
+  Svelte: '#ff3e00',
   Shell: '#89e051',
   HTML: '#e34c26',
   CSS: '#563d7c',
   SCSS: '#c6538c',
-  default: '#6366f1',
+  Zig: '#ec915c',
+  default: '#6b7280',
 };
 
 // Recharts tooltip style helper

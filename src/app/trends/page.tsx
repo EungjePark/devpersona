@@ -1,19 +1,6 @@
 import { Metadata } from 'next';
 import Link from 'next/link';
-import {
-  LanguageChart,
-  LibraryPopularity,
-  RepoRankings,
-  RepoHealth,
-  CountryMap,
-} from '@/components/trends';
-import {
-  SIMULATED_TRENDING_REPOS,
-  SIMULATED_LANGUAGES,
-  SIMULATED_LIBRARIES,
-  SIMULATED_COUNTRIES,
-  SIMULATED_REPO_HEALTH,
-} from '@/lib/trends/types';
+import TrendsClient from './TrendsClient';
 
 export const metadata: Metadata = {
   title: 'Global Tech Trends | DevPersona',
@@ -70,47 +57,11 @@ export default function TrendsPage() {
             Discover what developers are building worldwide. Real-time insights into
             languages, libraries, and the open source ecosystem.
           </p>
-          <div className="mt-6 flex items-center justify-center gap-4 text-sm text-text-muted">
-            <span className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-              Updated hourly
-            </span>
-            <span>•</span>
-            <span>Data from GitHub, npm, and more</span>
-          </div>
         </div>
       </section>
 
-      {/* Content */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
-        {/* Trending Repos - Full Width */}
-        <div className="mb-12 bg-bg-secondary/50 backdrop-blur-md rounded-2xl p-6 border border-white/5">
-          <RepoRankings repos={SIMULATED_TRENDING_REPOS} />
-        </div>
-
-        {/* Two Column Grid */}
-        <div className="grid lg:grid-cols-2 gap-8 mb-12">
-          {/* Language Distribution */}
-          <div className="bg-bg-secondary/50 backdrop-blur-md rounded-2xl p-6 border border-white/5">
-            <LanguageChart languages={SIMULATED_LANGUAGES} />
-          </div>
-
-          {/* Library Popularity */}
-          <div className="bg-bg-secondary/50 backdrop-blur-md rounded-2xl p-6 border border-white/5">
-            <LibraryPopularity libraries={SIMULATED_LIBRARIES} />
-          </div>
-        </div>
-
-        {/* Repo Health - Full Width */}
-        <div className="mb-12 bg-bg-secondary/50 backdrop-blur-md rounded-2xl p-6 border border-white/5">
-          <RepoHealth health={SIMULATED_REPO_HEALTH} />
-        </div>
-
-        {/* Country Distribution - Full Width */}
-        <div className="bg-bg-secondary/50 backdrop-blur-md rounded-2xl p-6 border border-white/5">
-          <CountryMap countries={SIMULATED_COUNTRIES} />
-        </div>
-      </section>
+      {/* Dynamic Content from Convex */}
+      <TrendsClient />
 
       {/* CTA */}
       <section className="py-16 border-t border-white/5">
@@ -138,7 +89,7 @@ export default function TrendsPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between">
             <p className="text-sm text-text-muted">
-              Data sources: GitHub API, npm Registry, HN Algolia
+              Data sources: GitHub API (live)
             </p>
             <p className="text-sm text-text-muted">
               Built with <span className="text-red-400">♥</span> by DevPersona
