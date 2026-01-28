@@ -1,19 +1,40 @@
 import { NextRequest, NextResponse } from "next/server";
+import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 
 /**
- * Cloudflare Images Upload API
+ * Cloudflare R2 Upload API (Free tier: 10GB storage, 1M writes/month)
  *
  * Environment variables required:
- * - CLOUDFLARE_ACCOUNT_ID: Your Cloudflare account ID
- * - CLOUDFLARE_API_TOKEN: API token with Images permissions
+ * - R2_ACCOUNT_ID: Your Cloudflare account ID
+ * - R2_ACCESS_KEY_ID: R2 API token access key ID
+ * - R2_SECRET_ACCESS_KEY: R2 API token secret access key
+ * - R2_BUCKET_NAME: Your R2 bucket name
+ * - R2_PUBLIC_URL: Public URL for the bucket (e.g., https://pub-xxx.r2.dev or custom domain)
  *
  * Usage:
  * POST /api/upload with FormData containing 'file' field
  */
 
-const CLOUDFLARE_ACCOUNT_ID = process.env.CLOUDFLARE_ACCOUNT_ID;
-const CLOUDFLARE_API_TOKEN = process.env.CLOUDFLARE_API_TOKEN;
-const CLOUDFLARE_IMAGES_URL = `https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/images/v1`;
+const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID;
+const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID;
+const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY;
+const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME;
+const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL;
+
+// Initialize S3 client for R2
+const getR2Client = () => {
+  if (!R2_ACCOUNT_ID || !R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY) {
+    return null;
+  }
+  return new S3Client({
+    region: "auto",
+    endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+    credentials: {
+      accessKeyId: R2_ACCESS_KEY_ID,
+      secretAccessKey: R2_SECRET_ACCESS_KEY,
+    },
+  });
+};
 
 // Max file size: 10MB
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
@@ -26,11 +47,36 @@ const ALLOWED_TYPES = [
   "image/webp",
 ];
 
+// Get file extension from MIME type
+const getExtension = (mimeType: string): string => {
+  const map: Record<string, string> = {
+    "image/jpeg": "jpg",
+    "image/png": "png",
+    "image/gif": "gif",
+    "image/webp": "webp",
+  };
+  return map[mimeType] || "bin";
+};
+
+// Generate unique filename
+const generateFilename = (originalName: string, mimeType: string): string => {
+  const timestamp = Date.now();
+  const random = Math.random().toString(36).substring(2, 8);
+  const ext = getExtension(mimeType);
+  const safeName = originalName
+    .replace(/\.[^/.]+$/, "") // Remove extension
+    .replace(/[^a-zA-Z0-9-_]/g, "_") // Sanitize
+    .substring(0, 32); // Limit length
+  return `uploads/${timestamp}-${random}-${safeName}.${ext}`;
+};
+
 export async function POST(request: NextRequest) {
   try {
+    const r2Client = getR2Client();
+
     // Check environment variables
-    if (!CLOUDFLARE_ACCOUNT_ID || !CLOUDFLARE_API_TOKEN) {
-      console.error("Missing Cloudflare credentials");
+    if (!r2Client || !R2_BUCKET_NAME || !R2_PUBLIC_URL) {
+      console.error("Missing R2 credentials");
       return NextResponse.json(
         { error: "Image upload service not configured" },
         { status: 503 }
@@ -64,45 +110,38 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Prepare Cloudflare upload
-    const cloudflareFormData = new FormData();
-    cloudflareFormData.append("file", file);
+    // Generate unique key
+    const key = generateFilename(file.name, file.type);
 
-    // Optional: Add metadata
-    const metadata = formData.get("metadata");
-    if (metadata) {
-      cloudflareFormData.append("metadata", metadata as string);
-    }
+    // Convert file to buffer
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
 
-    // Upload to Cloudflare Images
-    const response = await fetch(CLOUDFLARE_IMAGES_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${CLOUDFLARE_API_TOKEN}`,
+    // Upload to R2
+    const command = new PutObjectCommand({
+      Bucket: R2_BUCKET_NAME,
+      Key: key,
+      Body: buffer,
+      ContentType: file.type,
+      // Optional metadata
+      Metadata: {
+        originalName: file.name,
+        uploadedAt: new Date().toISOString(),
       },
-      body: cloudflareFormData,
     });
 
-    const result = await response.json();
+    await r2Client.send(command);
 
-    if (!response.ok || !result.success) {
-      console.error("Cloudflare upload failed:", result);
-      return NextResponse.json(
-        { error: result.errors?.[0]?.message || "Upload failed" },
-        { status: response.status }
-      );
-    }
-
-    // Return the image URL
-    const imageData = result.result;
+    // Construct public URL
+    const publicUrl = `${R2_PUBLIC_URL.replace(/\/$/, "")}/${key}`;
 
     return NextResponse.json({
       success: true,
-      id: imageData.id,
-      url: imageData.variants?.[0] || `https://imagedelivery.net/${CLOUDFLARE_ACCOUNT_ID}/${imageData.id}/public`,
-      variants: imageData.variants,
-      filename: imageData.filename,
-      uploaded: imageData.uploaded,
+      id: key,
+      url: publicUrl,
+      filename: file.name,
+      size: file.size,
+      type: file.type,
     });
   } catch (error) {
     console.error("Upload error:", error);
@@ -113,10 +152,12 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Direct URL upload (for URL-based images)
+// Direct URL upload (fetch and store)
 export async function PUT(request: NextRequest) {
   try {
-    if (!CLOUDFLARE_ACCOUNT_ID || !CLOUDFLARE_API_TOKEN) {
+    const r2Client = getR2Client();
+
+    if (!r2Client || !R2_BUCKET_NAME || !R2_PUBLIC_URL) {
       return NextResponse.json(
         { error: "Image upload service not configured" },
         { status: 503 }
@@ -124,7 +165,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { url, metadata } = body;
+    const { url } = body;
 
     if (!url) {
       return NextResponse.json(
@@ -134,21 +175,23 @@ export async function PUT(request: NextRequest) {
     }
 
     // Validate URL format with SSRF protection
+    let parsedUrl: URL;
     try {
-      const parsed = new URL(url);
-      if (!['http:', 'https:'].includes(parsed.protocol)) {
+      parsedUrl = new URL(url);
+      if (!["http:", "https:"].includes(parsedUrl.protocol)) {
         return NextResponse.json(
           { error: "Only HTTP(S) URLs allowed" },
           { status: 400 }
         );
       }
-      const host = parsed.hostname.toLowerCase();
+      const host = parsedUrl.hostname.toLowerCase();
       if (
-        host === 'localhost' ||
-        host === '127.0.0.1' ||
-        host.startsWith('10.') ||
-        host.startsWith('192.168.') ||
-        host.startsWith('169.254.')
+        host === "localhost" ||
+        host === "127.0.0.1" ||
+        host.startsWith("10.") ||
+        host.startsWith("192.168.") ||
+        host.startsWith("169.254.") ||
+        host.endsWith(".local")
       ) {
         return NextResponse.json(
           { error: "Invalid URL" },
@@ -162,40 +205,67 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    // Upload from URL to Cloudflare
-    const cloudflareFormData = new FormData();
-    cloudflareFormData.append("url", url);
-    if (metadata) {
-      cloudflareFormData.append("metadata", JSON.stringify(metadata));
-    }
-
-    const response = await fetch(CLOUDFLARE_IMAGES_URL, {
-      method: "POST",
+    // Fetch the image
+    const response = await fetch(url, {
       headers: {
-        Authorization: `Bearer ${CLOUDFLARE_API_TOKEN}`,
+        "User-Agent": "DevPersona/1.0 ImageFetcher",
       },
-      body: cloudflareFormData,
     });
 
-    const result = await response.json();
-
-    if (!response.ok || !result.success) {
-      console.error("Cloudflare URL upload failed:", result);
+    if (!response.ok) {
       return NextResponse.json(
-        { error: result.errors?.[0]?.message || "Upload from URL failed" },
-        { status: response.status }
+        { error: "Failed to fetch image from URL" },
+        { status: 400 }
       );
     }
 
-    const imageData = result.result;
+    const contentType = response.headers.get("content-type") || "image/jpeg";
+
+    // Validate content type
+    if (!ALLOWED_TYPES.some((t) => contentType.startsWith(t))) {
+      return NextResponse.json(
+        { error: "URL does not point to a valid image" },
+        { status: 400 }
+      );
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    // Check size
+    if (buffer.length > MAX_FILE_SIZE) {
+      return NextResponse.json(
+        { error: "Image too large. Maximum size: 10MB" },
+        { status: 400 }
+      );
+    }
+
+    // Generate filename from URL
+    const urlFilename = parsedUrl.pathname.split("/").pop() || "image";
+    const key = generateFilename(urlFilename, contentType.split(";")[0]);
+
+    // Upload to R2
+    const command = new PutObjectCommand({
+      Bucket: R2_BUCKET_NAME,
+      Key: key,
+      Body: buffer,
+      ContentType: contentType,
+      Metadata: {
+        sourceUrl: url,
+        uploadedAt: new Date().toISOString(),
+      },
+    });
+
+    await r2Client.send(command);
+
+    const publicUrl = `${R2_PUBLIC_URL.replace(/\/$/, "")}/${key}`;
 
     return NextResponse.json({
       success: true,
-      id: imageData.id,
-      url: imageData.variants?.[0] || `https://imagedelivery.net/${CLOUDFLARE_ACCOUNT_ID}/${imageData.id}/public`,
-      variants: imageData.variants,
-      filename: imageData.filename,
-      uploaded: imageData.uploaded,
+      id: key,
+      url: publicUrl,
+      size: buffer.length,
+      type: contentType,
     });
   } catch (error) {
     console.error("URL upload error:", error);
@@ -206,10 +276,12 @@ export async function PUT(request: NextRequest) {
   }
 }
 
-// Get upload status or delete image
+// Delete image
 export async function DELETE(request: NextRequest) {
   try {
-    if (!CLOUDFLARE_ACCOUNT_ID || !CLOUDFLARE_API_TOKEN) {
+    const r2Client = getR2Client();
+
+    if (!r2Client || !R2_BUCKET_NAME) {
       return NextResponse.json(
         { error: "Image upload service not configured" },
         { status: 503 }
@@ -226,30 +298,20 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    // Validate UUID format to prevent injection
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!uuidRegex.test(imageId)) {
+    // Validate key format (must be in uploads/ folder)
+    if (!imageId.startsWith("uploads/") || imageId.includes("..")) {
       return NextResponse.json(
         { error: "Invalid image ID format" },
         { status: 400 }
       );
     }
 
-    const response = await fetch(`${CLOUDFLARE_IMAGES_URL}/${imageId}`, {
-      method: "DELETE",
-      headers: {
-        Authorization: `Bearer ${CLOUDFLARE_API_TOKEN}`,
-      },
+    const command = new DeleteObjectCommand({
+      Bucket: R2_BUCKET_NAME,
+      Key: imageId,
     });
 
-    const result = await response.json();
-
-    if (!response.ok || !result.success) {
-      return NextResponse.json(
-        { error: result.errors?.[0]?.message || "Delete failed" },
-        { status: response.status }
-      );
-    }
+    await r2Client.send(command);
 
     return NextResponse.json({ success: true });
   } catch (error) {
