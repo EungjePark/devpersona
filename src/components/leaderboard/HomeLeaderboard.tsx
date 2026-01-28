@@ -1,5 +1,6 @@
 "use client";
 
+import { memo, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useQuery } from "convex/react";
@@ -7,33 +8,10 @@ import { api } from "../../../convex/_generated/api";
 import { cn } from "@/lib/utils";
 import { TIERS, type TierLevel } from "@/lib/types";
 import type { TopUser } from "@/lib/leaderboard-types";
+import { GlowBorder } from "@/components/ui/shine-border";
 
-// Demo data for when no real users exist
-const DEMO_USERS: TopUser[] = [
-  {
-    username: "torvalds",
-    avatarUrl: "https://avatars.githubusercontent.com/u/1024025?v=4",
-    overallRating: 98,
-    tier: "S" as TierLevel,
-    archetypeId: "maintainer",
-  },
-  {
-    username: "shadcn",
-    avatarUrl: "https://avatars.githubusercontent.com/u/124599?v=4",
-    overallRating: 91,
-    tier: "S" as TierLevel,
-    archetypeId: "specialist",
-  },
-  {
-    username: "tanstack",
-    avatarUrl: "https://avatars.githubusercontent.com/u/72518640?v=4",
-    overallRating: 89,
-    tier: "A" as TierLevel,
-    archetypeId: "maintainer",
-  },
-];
-
-function LeaderboardSkeleton(): React.ReactNode {
+// Memoized skeleton for loading state
+const LeaderboardSkeleton = memo(function LeaderboardSkeleton() {
   return (
     <div className="space-y-2">
       {Array.from({ length: 5 }).map((_, i) => (
@@ -52,10 +30,91 @@ function LeaderboardSkeleton(): React.ReactNode {
       ))}
     </div>
   );
+});
+
+// Pre-computed rank styles
+const RANK_STYLES = {
+  0: "text-tier-legendary",
+  1: "text-gray-300",
+  2: "text-tier-legendary",
+  default: "text-text-muted",
+} as const;
+
+// Memoized user item component
+interface UserItemProps {
+  user: TopUser;
+  index: number;
 }
+
+const UserItem = memo(function UserItem({ user, index }: UserItemProps) {
+  const tier = TIERS[user.tier as TierLevel];
+  const rankStyle = RANK_STYLES[index as keyof typeof RANK_STYLES] ?? RANK_STYLES.default;
+
+  // Memoize style objects
+  const tierTextStyle = useMemo(() => ({
+    color: tier?.color ?? "var(--text-muted)",
+  }), [tier?.color]);
+
+  const ratingStyle = useMemo(() => ({
+    backgroundColor: `${tier?.color ?? "#6b7280"}15`,
+    color: tier?.color ?? "#6b7280",
+  }), [tier?.color]);
+
+  return (
+    <Link
+      href={`/analyze/${user.username}`}
+      className={cn(
+        "flex items-center gap-3 p-3 rounded-xl transition-all duration-200",
+        "hover:bg-bg-elevated hover:scale-[1.01] hover:border-glass-border border border-transparent",
+        "group cursor-pointer"
+      )}
+    >
+      {/* Rank */}
+      <span className={cn("w-6 text-center font-bold text-lg", rankStyle)}>
+        {index + 1}
+      </span>
+
+      {/* Avatar */}
+      <div className="relative w-10 h-10 rounded-full overflow-hidden border border-glass-border group-hover:border-text-secondary transition-colors">
+        <Image
+          src={user.avatarUrl}
+          alt={user.username}
+          fill
+          sizes="40px"
+          className="object-cover"
+        />
+      </div>
+
+      {/* Username + Tier */}
+      <div className="flex-1 min-w-0">
+        <p className="font-medium text-text-primary truncate group-hover:text-white transition-colors">
+          @{user.username}
+        </p>
+        <p className="text-xs font-medium opacity-80" style={tierTextStyle}>
+          {tier?.name ?? "COMMON"}
+        </p>
+      </div>
+
+      {/* Rating */}
+      <div
+        className="px-2.5 py-1 rounded-md font-bold text-sm border border-transparent group-hover:border-glass-border"
+        style={ratingStyle}
+      >
+        {user.overallRating}
+      </div>
+    </Link>
+  );
+});
 
 export function HomeLeaderboard() {
   const snapshot = useQuery(api.analyses.getLeaderboardSnapshot);
+
+  // Memoize top 8 users
+  const topUsers = useMemo(() => {
+    return (snapshot?.topUsers ?? []).slice(0, 8);
+  }, [snapshot?.topUsers]);
+
+  const isEmpty = topUsers.length === 0;
 
   // Loading state
   if (snapshot === undefined) {
@@ -72,112 +131,49 @@ export function HomeLeaderboard() {
     );
   }
 
-  // Use demo data if no users exist
-  const topUsers = snapshot?.topUsers?.length ? snapshot.topUsers : DEMO_USERS;
-  const isDemo = !snapshot?.topUsers?.length;
-
   return (
-    <div className="glass-panel rounded-2xl p-6">
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-bold text-text-primary">Top Developers</h2>
-        {isDemo && (
-          <span className="text-xs text-text-muted px-2 py-1 rounded-full bg-bg-elevated border border-glass-border">
-            Demo
-          </span>
+    <GlowBorder
+      color="#8b5cf6"
+      intensity={0.4}
+      className="w-full"
+    >
+      <div className="glass-panel rounded-2xl p-6 bg-bg-secondary/80">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-bold text-text-primary">Top Developers</h2>
+          {!isEmpty && (
+            <span className="text-xs text-text-muted px-2 py-1 rounded-full bg-bg-elevated border border-glass-border animate-pulse">
+              Live
+            </span>
+          )}
+        </div>
+
+        {isEmpty ? (
+          <div className="text-center py-8 space-y-3">
+            <div className="text-4xl">🚀</div>
+            <p className="text-sm text-text-muted">No developers analyzed yet.</p>
+            <p className="text-xs text-text-muted/60">Be the first to join the leaderboard!</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {topUsers.map((user, index) => (
+              <UserItem key={user.username} user={user} index={index} />
+            ))}
+          </div>
         )}
-      </div>
 
-      <div className="space-y-2">
-        {topUsers.slice(0, 8).map((user: TopUser, index: number) => {
-          const tier = TIERS[user.tier as TierLevel];
-
-          return (
-            <Link
-              key={user.username}
-              href={`/analyze/${user.username}`}
-              className={cn(
-                "flex items-center gap-3 p-3 rounded-xl transition-all duration-200",
-                "hover:bg-bg-elevated hover:scale-[1.01] hover:border-glass-border border border-transparent",
-                "group cursor-pointer"
-              )}
-            >
-              {/* Rank */}
-              <span
-                className={cn(
-                  "w-6 text-center font-bold text-lg",
-                  index === 0
-                    ? "text-tier-legendary"
-                    : index === 1
-                      ? "text-gray-300"
-                      : index === 2
-                        ? "text-tier-legendary" // Reuse goldish/bronze
-                        : "text-text-muted"
-                )}
-              >
-                {index + 1}
-              </span>
-
-              {/* Avatar */}
-              <div className="relative w-10 h-10 rounded-full overflow-hidden border border-glass-border group-hover:border-text-secondary transition-colors">
-                <Image
-                  src={user.avatarUrl}
-                  alt={user.username}
-                  fill
-                  className="object-cover"
-                  unoptimized
-                />
-              </div>
-
-              {/* Username + Tier */}
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-text-primary truncate group-hover:text-white transition-colors">
-                  @{user.username}
-                </p>
-                <p
-                  className="text-xs font-medium opacity-80"
-                  style={{ color: tier?.color ?? "var(--text-muted)" }}
-                >
-                  {tier?.name ?? "COMMON"}
-                </p>
-              </div>
-
-              {/* Rating */}
-              <div
-                className="px-2.5 py-1 rounded-md font-bold text-sm border border-transparent group-hover:border-glass-border"
-                style={{
-                  backgroundColor: `${tier?.color ?? "#6b7280"}15`,
-                  color: tier?.color ?? "#6b7280",
-                }}
-              >
-                {user.overallRating}
-              </div>
-            </Link>
-          );
-        })}
-      </div>
-
-      {/* View All Link */}
-      <div className="mt-6 pt-4 border-t border-glass-border">
-        <Link
-          href="/leaderboard"
-          className="flex items-center justify-center gap-2 text-sm text-primary-400 hover:text-primary-300 transition-colors font-medium"
-        >
-          View Full Leaderboard
-          <svg
-            className="w-4 h-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
+        {/* View All Link */}
+        <div className="mt-6 pt-4 border-t border-glass-border">
+          <Link
+            href="/leaderboard"
+            className="flex items-center justify-center gap-2 text-sm text-primary-400 hover:text-primary-300 transition-colors font-medium group"
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M9 5l7 7-7 7"
-            />
-          </svg>
-        </Link>
+            View Full Leaderboard
+            <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </Link>
+        </div>
       </div>
-    </div>
+    </GlowBorder>
   );
 }

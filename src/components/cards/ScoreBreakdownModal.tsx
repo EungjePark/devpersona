@@ -37,7 +37,7 @@ export function ScoreBreakdownModal({ breakdown, isOpen, onClose }: ScoreBreakdo
                   <Dialog.Title className="text-lg font-bold text-white">
                     {breakdown.displayName}
                   </Dialog.Title>
-                  <p className="text-sm text-zinc-400">Score Breakdown</p>
+                  <Dialog.Description className="text-sm text-zinc-400">Score Breakdown</Dialog.Description>
                 </div>
               </div>
               <Dialog.Close asChild>

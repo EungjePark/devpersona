@@ -46,8 +46,7 @@ export async function POST(request: NextRequest) {
         'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400',
       },
     });
-  } catch (error) {
-    console.error('GitHub GraphQL proxy error:', error);
+  } catch {
     return NextResponse.json(
       { error: 'Failed to fetch from GitHub GraphQL API' },
       { status: 500 }

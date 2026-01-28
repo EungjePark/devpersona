@@ -42,3 +42,10 @@ next-env.d.ts
 
 # Convex auto-generated
 convex/_generated/
+
+# clerk configuration (can include secrets)
+/.clerk/
+
+# Claude Code auto-generated files
+.claude/
+**/CLAUDE.md

@@ -3,6 +3,7 @@
 // Uses server-side GITHUB_TOKEN for API calls
 
 import { NextRequest, NextResponse } from 'next/server';
+import { requireBearerAuth } from '@/lib/api/auth';
 
 export const runtime = 'edge';
 
@@ -31,23 +32,15 @@ interface GitHubUser {
 }
 
 export async function GET(request: NextRequest) {
-  const token = process.env.GITHUB_TOKEN;
+  // SECURITY: Auth first - prevent info leak about server config
+  const auth = requireBearerAuth(request, 'SEED_SECRET');
+  if (!auth.success) return auth.response;
 
+  const token = process.env.GITHUB_TOKEN;
   if (!token) {
     return NextResponse.json(
       { error: 'GitHub token not configured' },
       { status: 500 }
-    );
-  }
-
-  // Check for secret key to prevent abuse
-  const authHeader = request.headers.get('Authorization');
-  const seedSecret = process.env.SEED_SECRET;
-
-  if (seedSecret && authHeader !== `Bearer ${seedSecret}`) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401 }
     );
   }
 
@@ -119,23 +112,15 @@ export async function GET(request: NextRequest) {
 
 // Search GitHub for popular developers
 export async function POST(request: NextRequest) {
-  const token = process.env.GITHUB_TOKEN;
+  // SECURITY: Auth first - prevent info leak about server config
+  const auth = requireBearerAuth(request, 'SEED_SECRET');
+  if (!auth.success) return auth.response;
 
+  const token = process.env.GITHUB_TOKEN;
   if (!token) {
     return NextResponse.json(
       { error: 'GitHub token not configured' },
       { status: 500 }
-    );
-  }
-
-  // Check for secret key
-  const authHeader = request.headers.get('Authorization');
-  const seedSecret = process.env.SEED_SECRET;
-
-  if (seedSecret && authHeader !== `Bearer ${seedSecret}`) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401 }
     );
   }
 

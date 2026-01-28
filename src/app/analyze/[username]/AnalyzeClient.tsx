@@ -3,18 +3,42 @@
 import { useEffect, useState, useCallback, useRef, useMemo, memo } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useAction } from 'convex/react';
+import { useAuth } from '@clerk/nextjs';
 import { api } from '../../../../convex/_generated/api';
 import { Button } from '@/components/ui/button';
-import { ContributionGraph, AchievementBadges, TierListComparison, HexagonRadar, SignalBars, GlobalRanking, SceneStellerAvatar } from '@/components/cards';
-import { ScoreBreakdownModal } from '@/components/cards/ScoreBreakdownModal';
-import { BadgeShowcase } from '@/components/cards/BadgeShowcase';
-import { LeaderboardPanel, DistributionChart, MiniLeaderboard } from '@/components/leaderboard';
-import { LanguageEvolution, NpmPerformance, CareerPhase } from '@/components/career';
-import { StreakStats, CodingPatterns, TrendAnalysis, CodeOwnership, StarSummary, TopRepositories } from '@/components/analytics';
+// Direct imports for above-the-fold components
+import { SignalBars, SceneStellerAvatar } from '@/components/cards';
 import { PoweredBySceneSteller } from '@/components/SceneStellerBranding';
 import { ProfileTabs, TabPanel, type TabId, isValidTabId } from '@/components/layout/ProfileTabs';
+
+// Dynamic imports for heavy visualization components (below-the-fold)
+const HexagonRadar = dynamic(() => import('@/components/cards/HexagonRadar').then(mod => mod.HexagonRadar), { ssr: false });
+const ContributionGraph = dynamic(() => import('@/components/cards/ContributionGraph').then(mod => mod.ContributionGraph), { ssr: false });
+const AchievementBadges = dynamic(() => import('@/components/cards/AchievementBadges').then(mod => mod.AchievementBadges), { ssr: false });
+const TierListComparison = dynamic(() => import('@/components/cards/TierListComparison').then(mod => mod.TierListComparison), { ssr: false });
+const GlobalRanking = dynamic(() => import('@/components/cards/GlobalRanking').then(mod => mod.GlobalRanking), { ssr: false });
+const ScoreBreakdownModal = dynamic(() => import('@/components/cards/ScoreBreakdownModal').then(mod => mod.ScoreBreakdownModal), { ssr: false });
+const BadgeShowcase = dynamic(() => import('@/components/cards/BadgeShowcase').then(mod => mod.BadgeShowcase), { ssr: false });
+
+// Dynamic imports for tab-specific components
+const LeaderboardPanel = dynamic(() => import('@/components/leaderboard/LeaderboardPanel').then(mod => mod.LeaderboardPanel), { ssr: false });
+const DistributionChart = dynamic(() => import('@/components/leaderboard/DistributionChart').then(mod => mod.DistributionChart), { ssr: false });
+const MiniLeaderboard = dynamic(() => import('@/components/leaderboard/MiniLeaderboard').then(mod => mod.MiniLeaderboard), { ssr: false });
+const LanguageEvolution = dynamic(() => import('@/components/career/LanguageEvolution').then(mod => mod.LanguageEvolution), { ssr: false });
+const NpmPerformance = dynamic(() => import('@/components/career/NpmPerformance').then(mod => mod.NpmPerformance), { ssr: false });
+const CareerPhase = dynamic(() => import('@/components/career/CareerPhase').then(mod => mod.CareerPhase), { ssr: false });
+const StreakStats = dynamic(() => import('@/components/analytics/StreakStats').then(mod => mod.StreakStats), { ssr: false });
+const CodingPatterns = dynamic(() => import('@/components/analytics/CodingPatterns').then(mod => mod.CodingPatterns), { ssr: false });
+const TrendAnalysis = dynamic(() => import('@/components/analytics/TrendAnalysis').then(mod => mod.TrendAnalysis), { ssr: false });
+const CodeOwnership = dynamic(() => import('@/components/analytics/CodeOwnership').then(mod => mod.CodeOwnership), { ssr: false });
+const StarSummary = dynamic(() => import('@/components/analytics/StarSummary').then(mod => mod.StarSummary), { ssr: false });
+const TopRepositories = dynamic(() => import('@/components/analytics/TopRepositories').then(mod => mod.TopRepositories), { ssr: false });
+const SignalBoostCTA = dynamic(() => import('@/components/analytics/SignalBoostCTA').then(mod => mod.SignalBoostCTA), { ssr: false });
+import { AnimatedCounter } from '@/components/ui/animated-counter';
+import { ShineBorder } from '@/components/ui/shine-border';
 import { getRandomRoast } from '@/lib/analysis';
 import { ARCHETYPES } from '@/lib/analysis/archetypes';
 import { getSignalBreakdown, type SignalBreakdown } from '@/lib/analysis/breakdowns';
@@ -22,6 +46,84 @@ import type { SignalScores } from '@/lib/types';
 import { buildShareUrl } from '@/lib/url-state';
 import type { AnalysisResult, TierLevel, ArchetypeId } from '@/lib/types';
 import { TIER_DESIGN_TOKENS, TIERS } from '@/lib/types';
+
+// Floating Mini Navigation for analyze pages
+const QUICK_LINKS = [
+  { label: 'Home', href: '/', icon: '🏠' },
+  { label: 'Leaderboard', href: '/leaderboard', icon: '📊' },
+  { label: 'Launch', href: '/launch', icon: '🚀' },
+  { label: 'Roasting', href: '/board', icon: '🔥' },
+  { label: 'Station', href: '/station', icon: '🛸' },
+];
+
+function FloatingMiniNav({ username }: { username?: string }) {
+  const { isSignedIn, isLoaded } = useAuth();
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  return (
+    <div className="fixed top-4 right-4 z-50 flex items-center gap-2">
+      {/* Quick links - shown when expanded */}
+      <div
+        className={`
+          flex items-center gap-1 px-2 py-1.5 rounded-full
+          bg-bg-secondary/90 backdrop-blur-md border border-white/10
+          transition-all duration-300 ease-out overflow-hidden
+          ${isExpanded ? 'max-w-[500px] opacity-100' : 'max-w-0 opacity-0 px-0 border-0'}
+        `}
+      >
+        {QUICK_LINKS.map((link) => (
+          <Link
+            key={link.href}
+            href={link.href}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium text-text-secondary hover:text-white hover:bg-white/10 transition-all whitespace-nowrap"
+            title={link.label}
+          >
+            <span>{link.icon}</span>
+            <span className="hidden sm:inline">{link.label}</span>
+          </Link>
+        ))}
+        {/* My Profile link for authenticated users */}
+        {isLoaded && isSignedIn && username && (
+          <Link
+            href={`/analyze/${username}`}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium text-primary-400 hover:text-primary-300 hover:bg-primary-500/10 transition-all whitespace-nowrap border-l border-white/10 ml-1 pl-3"
+            title="My Profile"
+          >
+            <span>👤</span>
+            <span className="hidden sm:inline">My Profile</span>
+          </Link>
+        )}
+      </div>
+
+      {/* Toggle button */}
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className={`
+          flex items-center justify-center w-10 h-10 rounded-full
+          bg-bg-secondary/90 backdrop-blur-md border border-white/10
+          text-text-secondary hover:text-white hover:bg-white/10
+          transition-all duration-200 shadow-lg
+          ${isExpanded ? 'rotate-180' : ''}
+        `}
+        aria-label={isExpanded ? 'Close navigation' : 'Open navigation'}
+        aria-expanded={isExpanded}
+      >
+        <svg
+          className="w-4 h-4 transition-transform"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          {isExpanded ? (
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          ) : (
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+          )}
+        </svg>
+      </button>
+    </div>
+  );
+}
 
 interface AnalyzeClientProps {
   username: string;
@@ -199,8 +301,8 @@ export default function AnalyzeClient({ username }: AnalyzeClientProps) {
     router.replace(url.pathname + url.search, { scroll: false });
   }, [router]);
 
-  // Convex mutations and queries
-  const saveAnalysis = useMutation(api.analyses.saveAnalysis);
+  // Convex mutations, actions and queries
+  const saveAnalysis = useMutation(api.analyses.saveAnalysisPublic);
   const refreshLeaderboard = useAction(api.stats.refreshLeaderboard);
   const leaderboardSnapshot = useQuery(api.analyses.getLeaderboardSnapshot);
   const cachedAnalysis = useQuery(api.analyses.getByUsername, { username });
@@ -224,6 +326,8 @@ export default function AnalyzeClient({ username }: AnalyzeClientProps) {
       setRoast(getRandomRoast(data.archetype));
 
       // Save to Convex and refresh leaderboard
+      // Safeguard: fallback to 'comeback_kid' if archetype.id is missing
+      const archetypeId = data.archetype?.id || 'comeback_kid';
       saveAnalysis({
         username: data.username,
         avatarUrl: data.avatarUrl,
@@ -236,11 +340,15 @@ export default function AnalyzeClient({ username }: AnalyzeClientProps) {
         reach: data.signals.reach,
         overallRating: data.overallRating,
         tier: data.tier.level,
-        archetypeId: data.archetype.id,
+        archetypeId,
         analyzedAt: Date.now(),
+        // Extended metrics for user record creation
+        totalStars: data.totalStars ?? 0,
+        totalForks: data.totalForks ?? 0,
+        followers: data.followers ?? 0,
       })
         .then(() => refreshLeaderboard())
-        .catch(console.error);
+        .catch(() => {/* Silently fail - analysis saved regardless */});
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       setError(message);
@@ -311,6 +419,8 @@ export default function AnalyzeClient({ username }: AnalyzeClientProps) {
           setRoast(getRandomRoast(data.archetype));
 
           // Update Convex with fresh data
+          // Safeguard: fallback to 'comeback_kid' if archetype.id is missing
+          const archetypeId = data.archetype?.id || 'comeback_kid';
           saveAnalysis({
             username: data.username,
             avatarUrl: data.avatarUrl,
@@ -323,9 +433,13 @@ export default function AnalyzeClient({ username }: AnalyzeClientProps) {
             reach: data.signals.reach,
             overallRating: data.overallRating,
             tier: data.tier.level,
-            archetypeId: data.archetype.id,
+            archetypeId,
             analyzedAt: Date.now(),
-          }).catch(console.error);
+            // Extended metrics for user record creation
+            totalStars: data.totalStars ?? 0,
+            totalForks: data.totalForks ?? 0,
+            followers: data.followers ?? 0,
+          }).catch(() => {/* Silently fail - cached data already displayed */});
         } catch {
           // Silently fail - we still have cached data displayed
         }
@@ -417,6 +531,9 @@ ${shareUrl}`;
 
   return (
     <div className="min-h-screen relative overflow-x-hidden bg-bg-primary selection:bg-primary-500/30">
+      {/* Floating Mini Navigation */}
+      <FloatingMiniNav username={result?.username} />
+
       {/* Background decoration */}
       <div className="absolute inset-0 bg-grid-pattern opacity-[0.15] pointer-events-none fixed" />
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-3xl h-[500px] bg-primary-500/10 blur-[120px] rounded-full pointer-events-none" />
@@ -505,6 +622,9 @@ ${shareUrl}`;
                     onSignalClick={handleSignalClick}
                   />
                 </div>
+
+                {/* Signal Boost CTA - Show when user has low signals */}
+                <SignalBoostCTA signals={result.signals} className="mt-8" />
 
                 {/* Combined Activity & Achievements Panel */}
                 {result.contributions && (
@@ -683,27 +803,46 @@ ${shareUrl}`;
                       </h3>
                       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                         <div className="p-4 rounded-xl bg-white/[0.03] text-center">
-                          <div className="text-3xl font-bold" style={{ color: result.tier.color }}>
-                            {result.contributions.totalContributions.toLocaleString()}
-                          </div>
+                          <span style={{ color: result.tier.color }}>
+                            <AnimatedCounter
+                              value={result.contributions.totalContributions}
+                              duration={2000}
+                              compact
+                              size="xl"
+                              className="!text-3xl !text-inherit"
+                            />
+                          </span>
                           <div className="text-xs text-text-muted mt-1 uppercase tracking-wider">Total Contributions</div>
                         </div>
                         <div className="p-4 rounded-xl bg-white/[0.03] text-center">
-                          <div className="text-3xl font-bold text-white">
-                            {result.contributions.currentStreak}
-                          </div>
+                          <AnimatedCounter
+                            value={result.contributions.currentStreak}
+                            duration={1800}
+                            delay={200}
+                            size="xl"
+                            className="!text-3xl text-white"
+                          />
                           <div className="text-xs text-text-muted mt-1 uppercase tracking-wider">Current Streak</div>
                         </div>
                         <div className="p-4 rounded-xl bg-white/[0.03] text-center">
-                          <div className="text-3xl font-bold text-white">
-                            {result.contributions.longestStreak}
-                          </div>
+                          <AnimatedCounter
+                            value={result.contributions.longestStreak}
+                            duration={1600}
+                            delay={400}
+                            size="xl"
+                            className="!text-3xl text-white"
+                          />
                           <div className="text-xs text-text-muted mt-1 uppercase tracking-wider">Best Streak</div>
                         </div>
                         <div className="p-4 rounded-xl bg-white/[0.03] text-center">
-                          <div className="text-3xl font-bold text-white">
-                            {result.contributions.averagePerDay.toFixed(1)}
-                          </div>
+                          <AnimatedCounter
+                            value={result.contributions.averagePerDay}
+                            duration={1400}
+                            delay={600}
+                            decimals={1}
+                            size="xl"
+                            className="!text-3xl text-white"
+                          />
                           <div className="text-xs text-text-muted mt-1 uppercase tracking-wider">Daily Average</div>
                         </div>
                       </div>
@@ -717,7 +856,14 @@ ${shareUrl}`;
                 <div className="space-y-6">
 
                   {/* === HERO COMMAND CENTER === */}
-                  <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-black via-zinc-950 to-black border border-white/[0.08]">
+                  <ShineBorder
+                    borderRadius={24}
+                    borderWidth={2}
+                    colors={[result.tier.color, '#06b6d4', '#22c55e']}
+                    duration={10}
+                    className="w-full"
+                  >
+                  <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-black via-zinc-950 to-black">
                     {/* Animated Grid Background */}
                     <div className="absolute inset-0 opacity-20">
                       <div className="absolute inset-0" style={{
@@ -765,7 +911,12 @@ ${shareUrl}`;
                               textShadow: `0 0 60px ${result.tier.color}40`
                             }}
                           >
-                            {result.overallRating}
+                            <AnimatedCounter
+                              value={result.overallRating}
+                              duration={2000}
+                              size="hero"
+                              className="!text-inherit"
+                            />
                           </div>
                           <div className="mt-3 flex items-center justify-center lg:justify-start gap-2">
                             <span
@@ -812,41 +963,66 @@ ${shareUrl}`;
                             {result.contributions && (
                               <>
                                 <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.05] text-center">
-                                  <div className="text-2xl lg:text-3xl font-black text-white">
-                                    {result.contributions.totalContributions.toLocaleString()}
-                                  </div>
+                                  <AnimatedCounter
+                                    value={result.contributions.totalContributions}
+                                    duration={2000}
+                                    compact
+                                    size="lg"
+                                    className="text-white"
+                                  />
                                   <div className="text-[9px] font-mono uppercase text-text-muted mt-1">COMMITS</div>
                                 </div>
                                 <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.05] text-center">
-                                  <div className="text-2xl lg:text-3xl font-black text-orange-400">
-                                    {result.contributions.currentStreak}
-                                  </div>
+                                  <AnimatedCounter
+                                    value={result.contributions.currentStreak}
+                                    duration={1800}
+                                    delay={200}
+                                    size="lg"
+                                    className="text-orange-400"
+                                  />
                                   <div className="text-[9px] font-mono uppercase text-text-muted mt-1">STREAK</div>
                                 </div>
                                 <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.05] text-center">
-                                  <div className="text-2xl lg:text-3xl font-black text-emerald-400">
-                                    {result.contributions.averagePerDay.toFixed(1)}
-                                  </div>
+                                  <AnimatedCounter
+                                    value={result.contributions.averagePerDay}
+                                    duration={1600}
+                                    delay={400}
+                                    decimals={1}
+                                    size="lg"
+                                    className="text-emerald-400"
+                                  />
                                   <div className="text-[9px] font-mono uppercase text-text-muted mt-1">DAILY.AVG</div>
                                 </div>
                               </>
                             )}
                             <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.05] text-center">
-                              <div className="text-2xl lg:text-3xl font-black text-purple-400">
-                                {result.languages.length}
-                              </div>
+                              <AnimatedCounter
+                                value={result.languages.length}
+                                duration={1400}
+                                delay={600}
+                                size="lg"
+                                className="text-purple-400"
+                              />
                               <div className="text-[9px] font-mono uppercase text-text-muted mt-1">LANGUAGES</div>
                             </div>
                             <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.05] text-center">
-                              <div className="text-2xl lg:text-3xl font-black text-cyan-400">
-                                {result.npmPackages.length}
-                              </div>
+                              <AnimatedCounter
+                                value={result.npmPackages.length}
+                                duration={1200}
+                                delay={800}
+                                size="lg"
+                                className="text-cyan-400"
+                              />
                               <div className="text-[9px] font-mono uppercase text-text-muted mt-1">NPM.PKGS</div>
                             </div>
                             <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.05] text-center">
-                              <div className="text-2xl lg:text-3xl font-black text-pink-400">
-                                {result.communityMetrics?.externalPRs ?? 0}
-                              </div>
+                              <AnimatedCounter
+                                value={result.communityMetrics?.externalPRs ?? 0}
+                                duration={1000}
+                                delay={1000}
+                                size="lg"
+                                className="text-pink-400"
+                              />
                               <div className="text-[9px] font-mono uppercase text-text-muted mt-1">EXT.PRS</div>
                             </div>
                           </div>
@@ -854,6 +1030,7 @@ ${shareUrl}`;
                       </div>
                     </div>
                   </div>
+                  </ShineBorder>
 
                   {/* === SIGNAL ANALYSIS PANEL === */}
                   <div className="relative overflow-hidden rounded-2xl bg-gradient-to-b from-zinc-900/80 to-zinc-950/80 border border-white/[0.06]">
@@ -1169,11 +1346,15 @@ ${shareUrl}`;
                               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-orange-500 font-mono font-bold">@</span>
                               <input
                                 ref={compareInputRef}
+                                id="compare-username"
+                                name="rivalUsername"
                                 type="text"
                                 placeholder="Enter rival username..."
                                 value={compareUsername}
                                 onChange={(e) => setCompareUsername(e.target.value)}
                                 onKeyDown={(e) => e.key === 'Enter' && handleCompare()}
+                                aria-label="Rival GitHub username for comparison"
+                                autoComplete="username"
                                 className="w-full h-14 pl-10 pr-4 bg-black/60 border-2 border-orange-500/40 rounded-xl text-white text-lg placeholder:text-white/20 focus:outline-none focus:border-orange-500 font-medium transition-colors"
                               />
                             </div>
@@ -1282,17 +1463,42 @@ ${shareUrl}`;
                   {/* === QUICK STATS === */}
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                     <div className="p-5 rounded-xl bg-gradient-to-br from-yellow-950/30 to-black border border-yellow-500/10 text-center">
-                      <div className="text-3xl font-black text-yellow-400">{userRank?.rank || '—'}</div>
+                      {userRank?.rank ? (
+                        <AnimatedCounter
+                          value={userRank.rank}
+                          duration={1500}
+                          prefix="#"
+                          size="xl"
+                          className="!text-3xl text-yellow-400"
+                        />
+                      ) : (
+                        <div className="text-3xl font-black text-yellow-400">—</div>
+                      )}
                       <div className="text-[10px] font-mono uppercase text-text-muted mt-1">GLOBAL RANK</div>
                     </div>
                     <div className="p-5 rounded-xl bg-gradient-to-br from-green-950/30 to-black border border-green-500/10 text-center">
-                      <div className="text-3xl font-black text-green-400">
-                        {userRank?.percentile ? `${Math.round(100 - userRank.percentile)}%` : '—'}
-                      </div>
+                      {userRank?.percentile ? (
+                        <AnimatedCounter
+                          value={Math.round(100 - userRank.percentile)}
+                          duration={1500}
+                          delay={200}
+                          suffix="%"
+                          size="xl"
+                          className="!text-3xl text-green-400"
+                        />
+                      ) : (
+                        <div className="text-3xl font-black text-green-400">—</div>
+                      )}
                       <div className="text-[10px] font-mono uppercase text-text-muted mt-1">TOP PERCENTILE</div>
                     </div>
                     <div className="p-5 rounded-xl bg-gradient-to-br from-blue-950/30 to-black border border-blue-500/10 text-center">
-                      <div className="text-3xl font-black text-blue-400">{result.overallRating}</div>
+                      <AnimatedCounter
+                        value={result.overallRating}
+                        duration={1500}
+                        delay={400}
+                        size="xl"
+                        className="!text-3xl text-blue-400"
+                      />
                       <div className="text-[10px] font-mono uppercase text-text-muted mt-1">POWER LEVEL</div>
                     </div>
                     <div className="p-5 rounded-xl bg-gradient-to-br from-purple-950/30 to-black border border-purple-500/10 text-center">

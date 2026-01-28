@@ -82,16 +82,16 @@ const LanguageCard = memo(function LanguageCard({
         'rounded-xl transition-all duration-300 overflow-hidden',
         'bg-glass-surface border border-glass-border',
         'hover:border-[var(--lang-color-50)]',
-        isExpanded && 'col-span-2 row-span-2 border-[var(--lang-color-30)]'
+        isExpanded && 'border-[var(--lang-color-30)]'
       )}
       style={cardStyle}
     >
       {/* Main card */}
-      <button onClick={onToggle} className="w-full p-4 text-left transition-colors hover:bg-white/[0.02]">
-        <div className="flex items-start gap-3">
-          {/* Language Icon */}
+      <button onClick={onToggle} className="w-full p-3 sm:p-4 text-left transition-colors hover:bg-white/[0.02]">
+        <div className="flex items-center gap-2 sm:gap-3">
+          {/* Language Icon - Fixed size */}
           <div
-            className="w-10 h-10 rounded-lg flex items-center justify-center text-xs font-bold shrink-0"
+            className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center text-[10px] sm:text-xs font-bold shrink-0"
             style={{
               backgroundColor: `${langColor}15`,
               color: langColor,
@@ -101,13 +101,16 @@ const LanguageCard = memo(function LanguageCard({
             {langIcon}
           </div>
 
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <h4 className="font-semibold text-text-primary">{data.language}</h4>
+          {/* Info - Flex grow with min-width */}
+          <div className="flex-1 min-w-0 overflow-hidden">
+            <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+              <h4 className="font-semibold text-sm sm:text-base text-text-primary truncate">
+                {data.language}
+              </h4>
               {index < 3 && (
                 <span
                   className={cn(
-                    'text-[9px] px-1.5 py-0.5 rounded font-bold',
+                    'text-[8px] sm:text-[9px] px-1 sm:px-1.5 py-0.5 rounded font-bold shrink-0',
                     index === 0 && 'bg-amber-500/20 text-amber-400',
                     index === 1 && 'bg-zinc-400/20 text-zinc-300',
                     index === 2 && 'bg-orange-500/20 text-orange-400'
@@ -117,23 +120,23 @@ const LanguageCard = memo(function LanguageCard({
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-3 mt-1 text-xs text-text-muted">
-              <span className="flex items-center gap-1">
+            <div className="flex items-center gap-2 sm:gap-3 mt-0.5 sm:mt-1 text-[10px] sm:text-xs text-text-muted">
+              <span className="flex items-center gap-1 shrink-0">
                 <span className="text-amber-400">&#9733;</span>
                 {formatNumberCompact(data.totalStars)}
               </span>
-              <span>{formatNumberCompact(data.repoCount)} repos</span>
+              <span className="truncate">{formatNumberCompact(data.repoCount)} repos</span>
             </div>
           </div>
 
-          {/* Expand indicator */}
+          {/* Expand indicator - Fixed position */}
           <div
             className={cn(
-              'w-6 h-6 rounded-full bg-bg-elevated flex items-center justify-center text-text-muted transition-transform',
+              'w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-bg-elevated flex items-center justify-center text-text-muted transition-transform shrink-0',
               isExpanded && 'rotate-180'
             )}
           >
-            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-2.5 h-2.5 sm:w-3 sm:h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
             </svg>
           </div>
@@ -142,9 +145,9 @@ const LanguageCard = memo(function LanguageCard({
 
       {/* Expanded content */}
       {isExpanded && (
-        <div className="px-4 pb-4 space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
+        <div className="px-3 sm:px-4 pb-3 sm:pb-4 space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
           <div className="h-px bg-glass-border" />
-          <p className="text-xs text-text-muted py-1">Top repositories:</p>
+          <p className="text-[10px] sm:text-xs text-text-muted py-1">Top repositories:</p>
           {data.repos.slice(0, 5).map((repo, i) => (
             <a
               key={repo.fullName}
@@ -154,11 +157,11 @@ const LanguageCard = memo(function LanguageCard({
               className={cn('flex items-center gap-2 p-2 rounded-lg transition-colors', 'bg-white/[0.02] hover:bg-white/[0.05]')}
               onClick={(e) => e.stopPropagation()}
             >
-              <span className="w-4 text-center text-[10px] text-text-muted font-medium">{i + 1}</span>
-              <span className="flex-1 text-sm text-text-secondary truncate hover:text-text-primary transition-colors">
+              <span className="w-4 text-center text-[10px] text-text-muted font-medium shrink-0">{i + 1}</span>
+              <span className="flex-1 text-xs sm:text-sm text-text-secondary truncate hover:text-text-primary transition-colors">
                 {repo.fullName}
               </span>
-              <span className="text-[10px] text-amber-400 font-medium flex items-center gap-0.5">
+              <span className="text-[10px] text-amber-400 font-medium flex items-center gap-0.5 shrink-0">
                 &#9733; {formatNumberCompact(repo.stars)}
               </span>
             </a>
@@ -180,9 +183,9 @@ function LanguageBar({ language, totalStars, maxStars }: LanguageBarProps): Reac
   const percentage = (totalStars / maxStars) * 100;
 
   return (
-    <div className="flex items-center gap-3">
-      <span className="w-20 text-xs text-text-secondary truncate">{language}</span>
-      <div className="flex-1 h-2 bg-bg-elevated rounded-full overflow-hidden">
+    <div className="flex items-center gap-2 sm:gap-3">
+      <span className="w-16 sm:w-20 text-[10px] sm:text-xs text-text-secondary truncate">{language}</span>
+      <div className="flex-1 h-1.5 sm:h-2 bg-bg-elevated rounded-full overflow-hidden">
         <div
           className="h-full rounded-full transition-all duration-500"
           style={{
@@ -191,7 +194,7 @@ function LanguageBar({ language, totalStars, maxStars }: LanguageBarProps): Reac
           }}
         />
       </div>
-      <span className="w-12 text-[10px] text-text-muted text-right">{formatNumberCompact(totalStars)}</span>
+      <span className="w-10 sm:w-12 text-[9px] sm:text-[10px] text-text-muted text-right">{formatNumberCompact(totalStars)}</span>
     </div>
   );
 }
@@ -216,7 +219,7 @@ export const LanguageTrendsLive = memo(function LanguageTrendsLive() {
 
   if (isLoading) {
     return (
-      <section className="glass-panel rounded-2xl p-6 space-y-5">
+      <section className="glass-panel rounded-2xl p-4 sm:p-6 space-y-4 sm:space-y-5">
         <SectionHeader
           icon="&#128187;"
           iconGradient="bg-gradient-to-br from-blue-500/20 to-cyan-500/20"
@@ -231,7 +234,7 @@ export const LanguageTrendsLive = memo(function LanguageTrendsLive() {
 
   if (isEmpty) {
     return (
-      <section className="glass-panel rounded-2xl p-6 space-y-5">
+      <section className="glass-panel rounded-2xl p-4 sm:p-6 space-y-4 sm:space-y-5">
         <SectionHeader
           icon="&#128187;"
           iconGradient="bg-gradient-to-br from-blue-500/20 to-cyan-500/20"
@@ -246,7 +249,7 @@ export const LanguageTrendsLive = memo(function LanguageTrendsLive() {
   }
 
   return (
-    <section className="glass-panel rounded-2xl p-6 space-y-5">
+    <section className="glass-panel rounded-2xl p-4 sm:p-6 space-y-4 sm:space-y-5">
       <SectionHeader
         icon="&#128187;"
         iconGradient="bg-gradient-to-br from-blue-500/20 to-cyan-500/20"
@@ -257,23 +260,40 @@ export const LanguageTrendsLive = memo(function LanguageTrendsLive() {
       />
 
       {/* Bar visualization */}
-      <div className="space-y-2">
+      <div className="space-y-1.5 sm:space-y-2">
         {languages.slice(0, 5).map((lang) => (
           <LanguageBar key={lang.language} language={lang.language} totalStars={lang.totalStars} maxStars={maxStars} />
         ))}
       </div>
 
-      {/* Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {languages.map((lang, index) => (
-          <LanguageCard
-            key={lang.language}
-            data={lang}
-            index={index}
-            isExpanded={expandedIndex === index}
-            onToggle={() => handleToggle(index)}
-          />
-        ))}
+      {/* Grid - Fixed layout without col-span changes */}
+      <div className="space-y-2 sm:space-y-3">
+        {/* Expanded card shown separately at top if any */}
+        {expandedIndex !== null && languages[expandedIndex] && (
+          <div className="mb-3">
+            <LanguageCard
+              data={languages[expandedIndex]}
+              index={expandedIndex}
+              isExpanded={true}
+              onToggle={() => handleToggle(expandedIndex)}
+            />
+          </div>
+        )}
+
+        {/* Grid of collapsed cards */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+          {languages.map((lang, index) => (
+            expandedIndex !== index && (
+              <LanguageCard
+                key={lang.language}
+                data={lang}
+                index={index}
+                isExpanded={false}
+                onToggle={() => handleToggle(index)}
+              />
+            )
+          ))}
+        </div>
       </div>
 
       <SectionFooter href="https://github.com/trending" label="Explore all languages" />

@@ -30,7 +30,7 @@ export const StarSummary = memo(function StarSummary({
       {/* Stats grid */}
       <div className="grid grid-cols-3 gap-3">
         <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5 text-center">
-          <div className="text-2xl font-black" style={{ color: tierColor }}>
+          <div className="text-2xl font-black tabular-nums" style={{ color: tierColor }}>
             {formatCompactNumber(totalStars)}
           </div>
           <div className="text-[10px] text-text-muted uppercase tracking-wider mt-1">
@@ -38,7 +38,7 @@ export const StarSummary = memo(function StarSummary({
           </div>
         </div>
         <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5 text-center">
-          <div className="text-2xl font-black text-white">
+          <div className="text-2xl font-black text-white tabular-nums">
             {formatCompactNumber(totalForks)}
           </div>
           <div className="text-[10px] text-text-muted uppercase tracking-wider mt-1">
@@ -46,7 +46,7 @@ export const StarSummary = memo(function StarSummary({
           </div>
         </div>
         <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5 text-center">
-          <div className="text-2xl font-black text-white">
+          <div className="text-2xl font-black text-white tabular-nums">
             {repoCount}
           </div>
           <div className="text-[10px] text-text-muted uppercase tracking-wider mt-1">
@@ -60,9 +60,9 @@ export const StarSummary = memo(function StarSummary({
         <div className="p-4 rounded-xl bg-gradient-to-r from-yellow-500/10 to-amber-500/5 border border-yellow-500/20">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="text-2xl">🏅</span>
+              <span className="text-2xl" role="img" aria-label="Medal">🏅</span>
               <div>
-                <div className="text-sm font-bold text-white">
+                <div className="text-sm font-bold text-white tabular-nums">
                   Star Rank: #{starRank.toLocaleString()}
                 </div>
                 <div className="text-xs text-text-muted">

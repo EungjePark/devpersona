@@ -31,8 +31,6 @@ export async function GET(
     // Return the full analysis result
     return NextResponse.json(result);
   } catch (error) {
-    console.error(`Analysis error for ${cleanUsername}:`, error);
-
     // Handle specific error types
     if (error instanceof Error) {
       if (error.message.includes('rate limit')) {

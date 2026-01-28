@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ConvexHttpClient } from 'convex/browser';
 import { api } from '../../../../convex/_generated/api';
+import { requireBearerAuth } from '@/lib/api/auth';
 
-export const runtime = 'edge';
+export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 interface ScrapedRanking {
@@ -70,7 +71,7 @@ async function scrapeGitstarRankings(pages: number = 1): Promise<ScrapedRanking[
         await new Promise((resolve) => setTimeout(resolve, 500));
       }
     } catch (error) {
-      console.error(`Error scraping page ${page}:`, error);
+      console.error(`[scrape-rankings] Failed to fetch page ${page}:`, error);
     }
   }
 
@@ -84,13 +85,9 @@ async function scrapeGitstarRankings(pages: number = 1): Promise<ScrapedRanking[
   }).map((r, i) => ({ ...r, rank: i + 1 }));
 }
 
-export async function GET(request: NextRequest) {
-  const authHeader = request.headers.get('Authorization');
-  const apiKey = process.env.SCRAPE_API_KEY;
-
-  if (apiKey && authHeader !== `Bearer ${apiKey}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+export async function GET(request: NextRequest): Promise<NextResponse> {
+  const auth = requireBearerAuth(request, 'SCRAPE_API_KEY');
+  if (!auth.success) return auth.response;
 
   const { searchParams } = new URL(request.url);
   const pages = Math.min(parseInt(searchParams.get('pages') ?? '1', 10), 5);
@@ -100,10 +97,10 @@ export async function GET(request: NextRequest) {
     const rankings = await scrapeGitstarRankings(pages);
 
     if (rankings.length === 0) {
-      return NextResponse.json({
-        error: 'Failed to scrape rankings',
-        hint: 'HTML structure may have changed',
-      }, { status: 500 });
+      return NextResponse.json(
+        { error: 'Failed to scrape rankings', hint: 'HTML structure may have changed' },
+        { status: 500 }
+      );
     }
 
     if (dryRun) {
@@ -117,11 +114,14 @@ export async function GET(request: NextRequest) {
 
     const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
     if (!convexUrl) {
-      return NextResponse.json({ error: 'Convex URL not configured' }, { status: 500 });
+      return NextResponse.json(
+        { error: 'Convex URL not configured' },
+        { status: 500 }
+      );
     }
 
     const client = new ConvexHttpClient(convexUrl);
-    const result = await client.mutation(api.globalRankings.upsertRankings, {
+    const result = await client.mutation(api.globalRankings.upsertRankingsPublic, {
       rankings: rankings.map((r) => ({
         rank: r.rank,
         username: r.username,
@@ -130,15 +130,17 @@ export async function GET(request: NextRequest) {
       })),
     });
 
-    return NextResponse.json({ success: true, ...result, sample: rankings.slice(0, 5) });
-  } catch (error) {
     return NextResponse.json({
-      error: 'Scraping failed',
-      message: error instanceof Error ? error.message : 'Unknown error',
-    }, { status: 500 });
+      success: true,
+      ...result,
+      sample: rankings.slice(0, 5),
+    });
+  } catch (error) {
+    return NextResponse.json(
+      { error: 'Scraping failed', message: error instanceof Error ? error.message : 'Unknown error' },
+      { status: 500 }
+    );
   }
 }
 
-export async function POST(request: NextRequest) {
-  return GET(request);
-}
+export { GET as POST };

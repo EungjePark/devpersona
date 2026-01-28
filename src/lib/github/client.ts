@@ -72,29 +72,28 @@ export async function fetchRepos(
 ): Promise<GitHubRepo[]> {
   const perPage = Math.min(limit, 100);
   const pages = Math.ceil(limit / perPage);
-  const repos: GitHubRepo[] = [];
 
-  for (let page = 1; page <= pages && repos.length < limit; page++) {
-    const response = await fetch(
-      `${GITHUB_API}/users/${username}/repos?per_page=${perPage}&page=${page}&sort=pushed&direction=desc`,
+  // Fetch all pages in parallel for better performance
+  const pagePromises = Array.from({ length: pages }, (_, i) =>
+    fetch(
+      `${GITHUB_API}/users/${username}/repos?per_page=${perPage}&page=${i + 1}&sort=pushed&direction=desc`,
       {
         headers: getHeaders(options.token),
         next: { revalidate: 3600 },
       }
-    );
-
-    if (!response.ok) {
-      if (response.status === 403) {
-        throw new Error('Rate limit exceeded. Please sign in with GitHub.');
+    ).then(async (response) => {
+      if (!response.ok) {
+        if (response.status === 403) {
+          throw new Error('Rate limit exceeded. Please sign in with GitHub.');
+        }
+        return [] as GitHubRepo[];
       }
-      break;
-    }
+      return response.json() as Promise<GitHubRepo[]>;
+    })
+  );
 
-    const pageRepos: GitHubRepo[] = await response.json();
-    if (pageRepos.length === 0) break;
-
-    repos.push(...pageRepos);
-  }
+  const pageResults = await Promise.all(pagePromises);
+  const repos = pageResults.flat();
 
   return repos.slice(0, limit);
 }
@@ -254,8 +253,7 @@ export async function fetchContributions(
       totalContributions: calendar.totalContributions,
       averagePerDay: totalDays > 0 ? Math.round((daysWithContributions / totalDays) * 100) / 100 : 0,
     };
-  } catch (error) {
-    console.error('Failed to fetch contributions:', error);
+  } catch {
     return null;
   }
 }

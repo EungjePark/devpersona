@@ -1,15 +1,11 @@
 import { internalAction, internalMutation, action } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
-import type { GenericActionCtx, GenericMutationCtx } from "convex/server";
-import type { DataModel, Id } from "./_generated/dataModel";
-import type {
-  DistributionBucket,
-  LeaderboardSnapshot,
-} from "../src/lib/leaderboard-types";
+import type { GenericActionCtx } from "convex/server";
+import type { DataModel } from "./_generated/dataModel";
+import type { DistributionBucket } from "../src/lib/leaderboard-types";
 
 type ActionCtx = GenericActionCtx<DataModel>;
-type MutationCtx = GenericMutationCtx<DataModel>;
 
 // Helper: Calculate distribution buckets from analyses
 function calculateDistribution(
@@ -46,6 +42,37 @@ interface ExtendedTopUser {
   topLanguage?: string;
 }
 
+// Analysis type from Convex DB
+interface AnalysisDoc {
+  username: string;
+  avatarUrl: string;
+  overallRating: number;
+  tier: string;
+  archetypeId: string;
+  totalStars?: number;
+  followers?: number;
+  topLanguage?: string;
+}
+
+// Helper: Extract top users from sorted analyses
+function extractTopUsers(analyses: AnalysisDoc[], limit = 50): ExtendedTopUser[] {
+  return analyses.slice(0, limit).map((a) => ({
+    username: a.username,
+    avatarUrl: a.avatarUrl,
+    overallRating: a.overallRating,
+    tier: a.tier,
+    archetypeId: a.archetypeId,
+    totalStars: a.totalStars,
+    followers: a.followers,
+    topLanguage: a.topLanguage,
+  }));
+}
+
+// Helper: Sort analyses by rating descending
+function sortByRating<T extends { overallRating: number }>(analyses: T[]): T[] {
+  return [...analyses].sort((a, b) => b.overallRating - a.overallRating);
+}
+
 // Internal action: Update leaderboard snapshot WITH auto-seed (called by cron)
 // If analyses count < 10, automatically seed the database first
 export const updateLeaderboardSnapshotWithAutoSeed = internalAction({
@@ -55,9 +82,7 @@ export const updateLeaderboardSnapshotWithAutoSeed = internalAction({
 
     // 2. Auto-seed if below threshold
     if (all.length < 10) {
-      console.log(`[AutoSeed] Only ${all.length} analyses found, triggering quickSeed...`);
       await ctx.runAction(internal.seed.internalQuickSeed);
-      console.log(`[AutoSeed] Seed complete, fetching updated analyses...`);
     }
 
     // 3. Re-fetch after potential seed
@@ -66,35 +91,22 @@ export const updateLeaderboardSnapshotWithAutoSeed = internalAction({
       : all;
 
     if (analyses.length === 0) {
-      console.log('[AutoSeed] No analyses after seed, skipping snapshot update');
       return;
     }
 
     // 4. Sort by rating and extract top 50
-    const sorted = [...analyses].sort((a, b) => b.overallRating - a.overallRating);
-    const topUsers: ExtendedTopUser[] = sorted.slice(0, 50).map((a) => ({
-      username: a.username,
-      avatarUrl: a.avatarUrl,
-      overallRating: a.overallRating,
-      tier: a.tier,
-      archetypeId: a.archetypeId,
-      totalStars: a.totalStars,
-      followers: a.followers,
-      topLanguage: a.topLanguage,
-    }));
+    const sorted = sortByRating(analyses);
+    const topUsers = extractTopUsers(sorted);
 
     // 5. Calculate distribution
     const distribution = calculateDistribution(analyses);
 
     // 6. Upsert snapshot
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await ctx.runMutation(internal.stats.upsertSnapshot as any, {
+    await ctx.runMutation(internal.stats.upsertSnapshot, {
       topUsers,
       distribution,
       totalUsers: analyses.length,
     });
-
-    console.log(`[AutoSeed] Leaderboard updated with ${analyses.length} users`);
   },
 });
 
@@ -109,24 +121,14 @@ export const updateLeaderboardSnapshot = internalAction({
     }
 
     // 2. Sort by rating and extract top 50
-    const sorted = [...all].sort((a, b) => b.overallRating - a.overallRating);
-    const topUsers: ExtendedTopUser[] = sorted.slice(0, 50).map((a) => ({
-      username: a.username,
-      avatarUrl: a.avatarUrl,
-      overallRating: a.overallRating,
-      tier: a.tier,
-      archetypeId: a.archetypeId,
-      totalStars: a.totalStars,
-      followers: a.followers,
-      topLanguage: a.topLanguage,
-    }));
+    const sorted = sortByRating(all);
+    const topUsers = extractTopUsers(sorted);
 
     // 3. Calculate distribution
     const distribution = calculateDistribution(all);
 
     // 4. Upsert snapshot
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await ctx.runMutation(internal.stats.upsertSnapshot as any, {
+    await ctx.runMutation(internal.stats.upsertSnapshot, {
       topUsers,
       distribution,
       totalUsers: all.length,
@@ -145,28 +147,73 @@ export const refreshLeaderboard = action({
     }
 
     // Sort by rating and extract top 50
-    const sorted = [...all].sort((a, b) => b.overallRating - a.overallRating);
-    const topUsers: ExtendedTopUser[] = sorted.slice(0, 50).map((a) => ({
-      username: a.username,
-      avatarUrl: a.avatarUrl,
-      overallRating: a.overallRating,
-      tier: a.tier,
-      archetypeId: a.archetypeId,
-      totalStars: a.totalStars,
-      followers: a.followers,
-      topLanguage: a.topLanguage,
-    }));
+    const sorted = sortByRating(all);
+    const topUsers = extractTopUsers(sorted);
 
     // Calculate distribution
     const distribution = calculateDistribution(all);
 
     // Upsert snapshot
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await ctx.runMutation(internal.stats.upsertSnapshot as any, {
+    await ctx.runMutation(internal.stats.upsertSnapshot, {
       topUsers,
       distribution,
       totalUsers: all.length,
     });
+  },
+});
+
+// Public action: Manual trigger for leaderboard refresh with auto-seed
+// Use this to manually trigger the seed when analyses table is empty
+export const triggerAutoSeed = action({
+  handler: async (ctx: ActionCtx): Promise<{ seeded: boolean; message?: string; count?: number }> => {
+    // Check current analyses count
+    const all = await ctx.runQuery(internal.analyses.getAll);
+
+    if (all.length < 10) {
+      // Run the auto-seed
+      await ctx.runAction(internal.seed.internalQuickSeed);
+
+      // Re-fetch and update leaderboard
+      const analyses = await ctx.runQuery(internal.analyses.getAll);
+
+      if (analyses.length === 0) {
+        return { seeded: false, message: "Seed failed" };
+      }
+
+      // Sort by rating and extract top 50
+      const sorted = sortByRating(analyses);
+      const topUsers = extractTopUsers(sorted);
+
+      // Calculate distribution
+      const distribution = calculateDistribution(analyses);
+
+      // Upsert snapshot
+      await ctx.runMutation(internal.stats.upsertSnapshot, {
+        topUsers,
+        distribution,
+        totalUsers: analyses.length,
+      });
+
+      return { seeded: true, count: analyses.length };
+    }
+
+    return { seeded: false, message: "Already have enough data", count: all.length };
+  },
+});
+
+// Internal mutation: Clear leaderboard snapshot (for resetting data)
+export const clearSnapshot = internalMutation({
+  handler: async (ctx) => {
+    const existing = await ctx.db
+      .query("stats")
+      .filter((q) => q.eq(q.field("type"), "leaderboard"))
+      .first();
+
+    if (existing) {
+      await ctx.db.delete(existing._id);
+      return { deleted: true };
+    }
+    return { deleted: false };
   },
 });
 
@@ -193,12 +240,11 @@ export const upsertSnapshot = internalMutation({
     ),
     totalUsers: v.number(),
   },
-  handler: async (ctx: MutationCtx, args: LeaderboardSnapshot & { topUsers: ExtendedTopUser[] }) => {
+  handler: async (ctx, args) => {
     // Check for existing snapshot
     const existing = await ctx.db
       .query("stats")
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .filter((q: any) => q.eq(q.field("type"), "leaderboard"))
+      .filter((q) => q.eq(q.field("type"), "leaderboard"))
       .first();
 
     const data = {
@@ -210,11 +256,9 @@ export const upsertSnapshot = internalMutation({
     };
 
     if (existing) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await ctx.db.patch(existing._id as Id<"stats">, data as any);
+      await ctx.db.patch(existing._id, data);
     } else {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await ctx.db.insert("stats", data as any);
+      await ctx.db.insert("stats", data);
     }
   },
 });

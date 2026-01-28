@@ -72,7 +72,7 @@ const LeaderboardUserItem = memo(function LeaderboardUserItem({
       {/* Rank */}
       <span
         className={cn(
-          "w-6 text-center font-bold text-sm",
+          "w-6 text-center font-bold text-sm tabular-nums",
           index === 0 ? "text-yellow-400" :
             index === 1 ? "text-gray-300" :
               index === 2 ? "text-amber-600" :
@@ -112,7 +112,7 @@ const LeaderboardUserItem = memo(function LeaderboardUserItem({
       {/* OVR Rating with Tier Glow */}
       <div className="pr-1 flex items-center gap-2">
         <span
-          className="font-black text-base px-2 py-0.5 rounded"
+          className="font-black text-base px-2 py-0.5 rounded tabular-nums"
           style={{
             color: tier?.color,
             backgroundColor: `${tier?.color}15`,

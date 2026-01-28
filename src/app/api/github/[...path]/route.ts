@@ -8,12 +8,39 @@ const GITHUB_API = 'https://api.github.com';
 
 export const runtime = 'edge';
 
+// SECURITY: Whitelist of allowed GitHub API path patterns
+// Prevents arbitrary API access that could abuse the token
+const ALLOWED_PATH_PATTERNS = [
+  /^users\/[a-zA-Z0-9_-]+$/, // User profile
+  /^users\/[a-zA-Z0-9_-]+\/repos$/, // User repositories
+  /^users\/[a-zA-Z0-9_-]+\/events$/, // User events
+  /^users\/[a-zA-Z0-9_-]+\/events\/public$/, // User public events
+  /^repos\/[a-zA-Z0-9_-]+\/[a-zA-Z0-9._-]+$/, // Repository info
+  /^repos\/[a-zA-Z0-9_-]+\/[a-zA-Z0-9._-]+\/commits$/, // Repository commits
+  /^repos\/[a-zA-Z0-9_-]+\/[a-zA-Z0-9._-]+\/languages$/, // Repository languages
+  /^repos\/[a-zA-Z0-9_-]+\/[a-zA-Z0-9._-]+\/contributors$/, // Repository contributors
+  /^repos\/[a-zA-Z0-9_-]+\/[a-zA-Z0-9._-]+\/stats\/contributors$/, // Contributor stats
+];
+
+function isPathAllowed(path: string): boolean {
+  return ALLOWED_PATH_PATTERNS.some(pattern => pattern.test(path));
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ path: string[] }> }
 ) {
   const { path } = await params;
   const githubPath = path.join('/');
+
+  // SECURITY: Validate path against whitelist
+  if (!isPathAllowed(githubPath)) {
+    return NextResponse.json(
+      { error: 'Path not allowed' },
+      { status: 403 }
+    );
+  }
+
   const searchParams = request.nextUrl.searchParams.toString();
   const url = `${GITHUB_API}/${githubPath}${searchParams ? `?${searchParams}` : ''}`;
 
@@ -54,8 +81,7 @@ export async function GET(
         'X-RateLimit-Limit': response.headers.get('X-RateLimit-Limit') || '',
       },
     });
-  } catch (error) {
-    console.error('GitHub proxy error:', error);
+  } catch {
     return NextResponse.json(
       { error: 'Failed to fetch from GitHub API' },
       { status: 500 }

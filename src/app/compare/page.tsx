@@ -106,11 +106,15 @@ export default function CompareLandingPage() {
                 <div className="relative">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-orange-500 font-mono font-bold text-lg">@</span>
                   <input
+                    id="fighter-1"
+                    name="fighter1"
                     type="text"
                     placeholder="Enter username..."
                     value={userA}
                     onChange={(e) => setUserA(e.target.value)}
                     onKeyDown={handleUserAKeyDown}
+                    aria-label="Fighter 1 GitHub username"
+                    autoComplete="username"
                     className="w-full h-16 pl-10 pr-4 bg-black/60 border-2 border-orange-500/40 rounded-xl text-white text-lg placeholder:text-white/20 focus:outline-none focus:border-orange-500 font-medium transition-colors"
                     autoFocus
                   />
@@ -135,11 +139,15 @@ export default function CompareLandingPage() {
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-500 font-mono font-bold text-lg">@</span>
                   <input
                     ref={inputBRef}
+                    id="fighter-2"
+                    name="fighter2"
                     type="text"
                     placeholder="Enter username..."
                     value={userB}
                     onChange={(e) => setUserB(e.target.value)}
                     onKeyDown={handleUserBKeyDown}
+                    aria-label="Fighter 2 GitHub username"
+                    autoComplete="username"
                     className="w-full h-16 pl-10 pr-4 bg-black/60 border-2 border-blue-500/40 rounded-xl text-white text-lg placeholder:text-white/20 focus:outline-none focus:border-blue-500 font-medium transition-colors"
                   />
                 </div>

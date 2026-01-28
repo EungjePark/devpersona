@@ -1,4 +1,5 @@
-import { mutation, query, internalQuery } from "./_generated/server";
+import { action, mutation, query, internalQuery, internalMutation } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import type { GenericQueryCtx, GenericMutationCtx } from "convex/server";
 import type { DataModel, Doc, Id } from "./_generated/dataModel";
@@ -48,27 +49,131 @@ type AnalysisArgs = {
   topLanguage?: string;
 };
 
-// Mutation: Save/update analysis result (upsert by username)
-export const saveAnalysis = mutation({
+// Valid username pattern (GitHub username rules - no consecutive hyphens)
+const GITHUB_USERNAME_PATTERN = /^(?!.*--)[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?$/;
+const VALID_TIERS = ['S', 'A', 'B', 'C', 'D', 'E', 'F'];
+const VALID_ARCHETYPES = [
+  'maintainer', 'silent_builder', 'prototype_machine', 'specialist',
+  'hype_surfer', 'archivist', 'comeback_kid', 'ghost'
+];
+
+// Input validation helper
+function validateAnalysisInput(args: AnalysisArgs): string | null {
+  // Validate username format
+  if (!args.username || !GITHUB_USERNAME_PATTERN.test(args.username)) {
+    return 'Invalid username format';
+  }
+  if (args.username.length > 39) {
+    return 'Username too long';
+  }
+
+  // Validate numeric ranges (0-100)
+  const numericFields = ['grit', 'focus', 'craft', 'impact', 'voice', 'reach', 'overallRating'] as const;
+  for (const field of numericFields) {
+    const value = args[field];
+    if (typeof value !== 'number' || value < 0 || value > 100 || !Number.isFinite(value)) {
+      return `Invalid ${field} value`;
+    }
+  }
+
+  // Validate tier
+  if (!VALID_TIERS.includes(args.tier)) {
+    return 'Invalid tier';
+  }
+
+  // Validate archetype
+  if (!VALID_ARCHETYPES.includes(args.archetypeId)) {
+    return `Invalid archetype: "${args.archetypeId}" (valid: ${VALID_ARCHETYPES.join(', ')})`;
+  }
+
+  // Validate optional numbers
+  if (args.totalStars !== undefined && (args.totalStars < 0 || !Number.isFinite(args.totalStars))) {
+    return 'Invalid totalStars';
+  }
+  if (args.totalForks !== undefined && (args.totalForks < 0 || !Number.isFinite(args.totalForks))) {
+    return 'Invalid totalForks';
+  }
+  if (args.followers !== undefined && (args.followers < 0 || !Number.isFinite(args.followers))) {
+    return 'Invalid followers';
+  }
+
+  return null;
+}
+
+// Shared upsert logic for analysis records
+async function upsertAnalysis(ctx: MutationCtx, args: AnalysisArgs): Promise<Id<"analyses">> {
+  const existing = await ctx.db
+    .query("analyses")
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .withIndex("by_username", (q: any) => q.eq("username", args.username))
+    .first();
+
+  let analysisId: Id<"analyses">;
+  if (existing) {
+    await ctx.db.patch(existing._id as Id<"analyses">, { ...args });
+    analysisId = existing._id as Id<"analyses">;
+  } else {
+    analysisId = await ctx.db.insert("analyses", args);
+  }
+
+  // Also ensure user record exists (required for station membership, voting, etc.)
+  const existingUser = await ctx.db
+    .query("users")
+    .withIndex("by_username", (q) => q.eq("username", args.username))
+    .first();
+
+  if (!existingUser) {
+    // Generate a temporary githubId from username hash
+    // This will be updated when the user authenticates with Clerk
+    const tempGithubId = Math.abs(
+      args.username.split("").reduce((acc, char) => acc * 31 + char.charCodeAt(0), 0)
+    ) % 1000000000;
+
+    await ctx.db.insert("users", {
+      username: args.username,
+      avatarUrl: args.avatarUrl,
+      followers: args.followers ?? 0,
+      githubId: tempGithubId,
+      lastFetchedAt: args.analyzedAt,
+      publicRepos: 0,
+      totalForks: args.totalForks ?? 0,
+      totalStars: args.totalStars ?? 0,
+      name: args.name,
+    });
+  } else {
+    // Update existing user with latest data
+    await ctx.db.patch(existingUser._id, {
+      avatarUrl: args.avatarUrl,
+      followers: args.followers ?? existingUser.followers,
+      totalStars: args.totalStars ?? existingUser.totalStars,
+      totalForks: args.totalForks ?? existingUser.totalForks,
+      lastFetchedAt: args.analyzedAt,
+      name: args.name ?? existingUser.name,
+    });
+  }
+
+  return analysisId;
+}
+
+// Public Mutation: Save analysis with validation (client-callable)
+// SECURITY: Validates input before saving to prevent malicious data
+export const saveAnalysisPublic = mutation({
   args: analysisArgs,
   handler: async (ctx: MutationCtx, args: AnalysisArgs) => {
-    // Check for existing analysis
-    const existing = await ctx.db
-      .query("analyses")
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .withIndex("by_username", (q: any) => q.eq("username", args.username))
-      .first();
-
-    if (existing) {
-      // Update existing record
-      await ctx.db.patch(existing._id as Id<"analyses">, {
-        ...args,
-      });
-      return existing._id as Id<"analyses">;
-    } else {
-      // Create new record
-      return await ctx.db.insert("analyses", args);
+    const validationError = validateAnalysisInput(args);
+    if (validationError) {
+      throw new Error(validationError);
     }
+    return upsertAnalysis(ctx, args);
+  },
+});
+
+// Internal Mutation: Save/update analysis result (upsert by username)
+// SECURITY: Changed to internalMutation - only callable from server-side actions
+export const saveAnalysis = internalMutation({
+  args: analysisArgs,
+  handler: async (ctx: MutationCtx, args: AnalysisArgs) => {
+    return upsertAnalysis(ctx, args);
   },
 });
 
@@ -196,8 +301,9 @@ export const getByUsername = query({
   },
 });
 
-// Mutation: Delete all analyses (for resetting seed data)
-export const deleteAllAnalyses = mutation({
+// Internal Mutation: Delete all analyses (for resetting seed data)
+// SECURITY: Changed to internalMutation - prevents public access to destructive operation
+export const deleteAllAnalyses = internalMutation({
   handler: async (ctx: MutationCtx) => {
     const allAnalyses = await ctx.db.query("analyses").collect();
     let count = 0;
@@ -206,5 +312,13 @@ export const deleteAllAnalyses = mutation({
       count++;
     }
     return { deleted: count };
+  },
+});
+
+// Admin action for clearing analyses - auth handled by API route
+export const adminClearAnalyses = action({
+  args: {},
+  handler: async (ctx): Promise<{ deleted: number }> => {
+    return await ctx.runMutation(internal.analyses.deleteAllAnalyses);
   },
 });

@@ -1,5 +1,45 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, internalMutation, query } from "./_generated/server";
+import type { GenericMutationCtx } from "convex/server";
+import type { DataModel } from "./_generated/dataModel";
+
+type MutationCtx = GenericMutationCtx<DataModel>;
+
+// GitHub username validation pattern
+const GITHUB_USERNAME_PATTERN = /^[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?$/;
+const MAX_RANKINGS_PER_BATCH = 1000;
+
+type RankingData = {
+  rank: number;
+  username: string;
+  stars: number;
+  avatarUrl?: string;
+};
+
+// Shared upsert logic for rankings (delete all + insert new)
+async function performRankingsUpsert(
+  ctx: MutationCtx,
+  rankings: RankingData[]
+): Promise<{ updated: number; timestamp: number }> {
+  const now = Date.now();
+
+  // Delete existing rankings (full refresh)
+  const existing = await ctx.db.query("globalRankings").collect();
+  for (const doc of existing) {
+    await ctx.db.delete(doc._id);
+  }
+
+  // Insert new rankings
+  for (const ranking of rankings) {
+    await ctx.db.insert("globalRankings", {
+      ...ranking,
+      username: ranking.username.toLowerCase(),
+      fetchedAt: now,
+    });
+  }
+
+  return { updated: rankings.length, timestamp: now };
+}
 
 // Get top N global rankings
 export const getTopRankings = query({
@@ -36,37 +76,49 @@ export const getLastUpdate = query({
   },
 });
 
-// Batch upsert rankings (called from API route)
-export const upsertRankings = mutation({
-  args: {
-    rankings: v.array(
-      v.object({
-        rank: v.number(),
-        username: v.string(),
-        stars: v.number(),
-        avatarUrl: v.optional(v.string()),
-      })
-    ),
-  },
+const rankingsArgsValidator = v.array(
+  v.object({
+    rank: v.number(),
+    username: v.string(),
+    stars: v.number(),
+    avatarUrl: v.optional(v.string()),
+  })
+);
+
+// Input validation for public mutations
+function validateRankings(rankings: RankingData[]): void {
+  if (rankings.length > MAX_RANKINGS_PER_BATCH) {
+    throw new Error(`Batch size exceeds maximum of ${MAX_RANKINGS_PER_BATCH}`);
+  }
+  for (const r of rankings) {
+    if (!GITHUB_USERNAME_PATTERN.test(r.username) || r.username.length > 39) {
+      throw new Error(`Invalid username: ${r.username}`);
+    }
+    if (r.rank < 1 || !Number.isInteger(r.rank)) {
+      throw new Error(`Invalid rank: ${r.rank}`);
+    }
+    if (r.stars < 0 || !Number.isFinite(r.stars)) {
+      throw new Error(`Invalid stars: ${r.stars}`);
+    }
+  }
+}
+
+// Public Mutation: Batch upsert rankings with validation
+// SECURITY: Validates input; API route enforces auth via SCRAPE_API_KEY
+export const upsertRankingsPublic = mutation({
+  args: { rankings: rankingsArgsValidator },
   handler: async (ctx, args) => {
-    const now = Date.now();
+    validateRankings(args.rankings);
+    return performRankingsUpsert(ctx, args.rankings);
+  },
+});
 
-    // Delete existing rankings (full refresh)
-    const existing = await ctx.db.query("globalRankings").collect();
-    for (const doc of existing) {
-      await ctx.db.delete(doc._id);
-    }
-
-    // Insert new rankings
-    for (const ranking of args.rankings) {
-      await ctx.db.insert("globalRankings", {
-        ...ranking,
-        username: ranking.username.toLowerCase(),
-        fetchedAt: now,
-      });
-    }
-
-    return { updated: args.rankings.length, timestamp: now };
+// Internal Mutation: Batch upsert rankings (called from API route with auth)
+// SECURITY: Changed to internalMutation - prevents public manipulation of rankings
+export const upsertRankings = internalMutation({
+  args: { rankings: rankingsArgsValidator },
+  handler: async (ctx, args) => {
+    return performRankingsUpsert(ctx, args.rankings);
   },
 });
 

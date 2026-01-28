@@ -1,0 +1,17 @@
+'use client';
+
+import dynamic from 'next/dynamic';
+
+// Only load Agentation in development
+const Agentation = dynamic(
+  () => import('agentation').then((mod) => mod.Agentation),
+  { ssr: false }
+);
+
+export function DevTools() {
+  if (process.env.NODE_ENV !== 'development') {
+    return null;
+  }
+
+  return <Agentation />;
+}

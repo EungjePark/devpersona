@@ -1,4 +1,4 @@
-import { mutation, query, internalQuery } from "./_generated/server";
+import { internalMutation, query, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 import type { GenericQueryCtx, GenericMutationCtx } from "convex/server";
 import type { DataModel, Id } from "./_generated/dataModel";
@@ -33,8 +33,9 @@ type RepoArgs = {
   isFork?: boolean;
 };
 
-// Mutation: Upsert repository
-export const upsertRepository = mutation({
+// Internal Mutation: Upsert repository
+// SECURITY: Changed to internalMutation - only callable from server-side
+export const upsertRepository = internalMutation({
   args: repoArgs,
   handler: async (ctx: MutationCtx, args: RepoArgs) => {
     const existing = await ctx.db
@@ -57,8 +58,9 @@ export const upsertRepository = mutation({
   },
 });
 
-// Mutation: Bulk upsert repositories for a user
-export const bulkUpsertRepositories = mutation({
+// Internal Mutation: Bulk upsert repositories for a user
+// SECURITY: Changed to internalMutation - only callable from server-side
+export const bulkUpsertRepositories = internalMutation({
   args: {
     username: v.string(),
     userId: v.optional(v.id("users")),

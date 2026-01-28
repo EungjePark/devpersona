@@ -75,9 +75,7 @@ export async function GET(
         'Cache-Control': 'public, max-age=300, s-maxage=300',
       },
     });
-  } catch (error) {
-    console.error('Badge API error:', error);
-
+  } catch {
     const badge: BadgeResponse = {
       schemaVersion: 1,
       label: 'DevPersona',

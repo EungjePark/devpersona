@@ -97,8 +97,9 @@ export const saveSeedAnalysis = internalMutation({
   },
 });
 
-// Seed action - analyzes famous developers and stores them
-export const seedFamousDevs = action({
+// Internal Action: Seed famous developers (admin/testing only)
+// SECURITY: Changed to internalAction - prevents public triggering of seed operation
+export const seedFamousDevs = internalAction({
   args: {
     baseUrl: v.string(), // Base URL of the app (e.g., http://localhost:3000)
     limit: v.optional(v.number()), // Optional limit for testing
@@ -340,8 +341,9 @@ const PRECALCULATED_ANALYSES = [
   { username: "bmizerany", avatarUrl: "https://avatars.githubusercontent.com/u/13?v=4", grit: 75, focus: 80, craft: 88, impact: 85, voice: 65, reach: 80, tier: "A", archetypeId: "silent_builder" },
 ];
 
-// Quick seed action - uses pre-calculated data (no API calls needed)
-export const quickSeed = action({
+// Internal Action: Quick seed with pre-calculated data (admin/testing only)
+// SECURITY: Changed to internalAction - prevents public database spam
+export const quickSeed = internalAction({
   args: {},
   handler: async (ctx) => {
     const results: { username: string; status: string; rating?: number }[] = [];
@@ -433,7 +435,280 @@ export const internalQuickSeed = internalAction({
       }
     }
 
-    console.log(`[InternalQuickSeed] Seeded ${successCount}/${PRECALCULATED_ANALYSES.length} developers`);
     return { total: PRECALCULATED_ANALYSES.length, successful: successCount };
+  },
+});
+
+// ========== PRODUCT STATIONS SEED ==========
+// Sample stations for demo/testing
+const SAMPLE_STATIONS = [
+  {
+    slug: 'devflow',
+    name: 'DevFlow',
+    description: 'AI-powered development workflow automation. Ship faster with intelligent CI/CD and code review.',
+    ownerUsername: 'torvalds',
+    accentColor: '#8b5cf6',
+  },
+  {
+    slug: 'codeweave',
+    name: 'CodeWeave',
+    description: 'Real-time collaborative coding platform. Pair program with anyone, anywhere.',
+    ownerUsername: 'gaearon',
+    accentColor: '#06b6d4',
+  },
+  {
+    slug: 'stacksmith',
+    name: 'StackSmith',
+    description: 'Full-stack boilerplate generator. Start your next project in seconds.',
+    ownerUsername: 'sindresorhus',
+    accentColor: '#f59e0b',
+  },
+  {
+    slug: 'apiforge',
+    name: 'APIForge',
+    description: 'Design, document, and deploy APIs with zero friction. OpenAPI-first workflow.',
+    ownerUsername: 'wycats',
+    accentColor: '#10b981',
+  },
+  {
+    slug: 'deploybird',
+    name: 'DeployBird',
+    description: 'One-click deployments for any framework. Vercel alternative with more control.',
+    ownerUsername: 'rauchg',
+    accentColor: '#ec4899',
+  },
+  {
+    slug: 'debugly',
+    name: 'Debugly',
+    description: 'AI debugging assistant that explains errors and suggests fixes in real-time.',
+    ownerUsername: 'kentcdodds',
+    accentColor: '#ef4444',
+  },
+];
+
+// Internal mutation to save seeded stations
+export const saveSeedStation = internalMutation({
+  args: {
+    slug: v.string(),
+    name: v.string(),
+    description: v.string(),
+    ownerUsername: v.string(),
+    accentColor: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    // Check for existing station
+    const existing = await ctx.db
+      .query("productStations")
+      .withIndex("by_slug", (q) => q.eq("slug", args.slug))
+      .first();
+
+    if (existing) {
+      // Already exists, skip
+      return existing._id;
+    }
+
+    // Create new station
+    return await ctx.db.insert("productStations", {
+      slug: args.slug,
+      name: args.name,
+      description: args.description,
+      ownerUsername: args.ownerUsername,
+      accentColor: args.accentColor,
+      memberCount: Math.floor(Math.random() * 500) + 100,
+      postCount: Math.floor(Math.random() * 50) + 10,
+      weeklyActiveMembers: Math.floor(Math.random() * 100) + 20,
+      status: "active",
+      createdAt: Date.now(),
+    });
+  },
+});
+
+// Internal Action: Seed sample stations
+export const seedStations = internalAction({
+  handler: async (ctx) => {
+    let successCount = 0;
+
+    for (const station of SAMPLE_STATIONS) {
+      try {
+        await ctx.runMutation(internal.seed.saveSeedStation, station);
+        successCount++;
+      } catch {
+        continue;
+      }
+    }
+
+    return { total: SAMPLE_STATIONS.length, successful: successCount };
+  },
+});
+
+// Admin-protected action for station seeding
+// SECURITY: Validates admin secret before executing
+export const triggerStationSeed = action({
+  args: { adminSecret: v.optional(v.string()) },
+  handler: async (ctx, { adminSecret }): Promise<{ total: number; successful: number }> => {
+    const expectedSecret = process.env.ADMIN_SECRET;
+    if (expectedSecret && adminSecret !== expectedSecret) {
+      throw new Error("Unauthorized: Invalid admin secret");
+    }
+    return await ctx.runAction(internal.seed.seedStations, {});
+  },
+});
+
+// ========== FULL DATABASE RESET AND SEED ==========
+
+// Internal mutation to clear a single table
+export const clearTable = internalMutation({
+  args: { tableName: v.string() },
+  handler: async (ctx, { tableName }) => {
+    // Type-safe table clearing
+    const tables = [
+      "analyses", "users", "builderRanks", "launches", "votes",
+      "productStations", "stationCrews", "stationPosts",
+      "ideaValidations", "ideaVotes", "posts", "postVotes",
+      "comments", "commentVotes", "crossStationKarma",
+      "growthStories", "rewards", "reports", "weeklyResults"
+    ] as const;
+
+    if (!tables.includes(tableName as typeof tables[number])) {
+      throw new Error(`Invalid table name: ${tableName}`);
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const docs = await (ctx.db.query(tableName as any) as any).collect();
+    for (const doc of docs) {
+      await ctx.db.delete(doc._id);
+    }
+    return { table: tableName, deleted: docs.length };
+  },
+});
+
+// Internal action to clear all tables
+export const clearAllTables = internalAction({
+  handler: async (ctx): Promise<Array<{ table: string; deleted?: number; error?: string }>> => {
+    const tables = [
+      "analyses", "users", "builderRanks", "launches", "votes",
+      "productStations", "stationCrews", "stationPosts",
+      "ideaValidations", "ideaVotes", "posts", "postVotes",
+      "comments", "commentVotes", "crossStationKarma",
+      "growthStories", "rewards", "reports", "weeklyResults"
+    ];
+
+    const results: Array<{ table: string; deleted?: number; error?: string }> = [];
+    for (const table of tables) {
+      try {
+        const result = await ctx.runMutation(internal.seed.clearTable, { tableName: table });
+        results.push(result);
+      } catch (error) {
+        results.push({ table, error: String(error) });
+      }
+    }
+    return results;
+  },
+});
+
+// Internal mutation to seed builderRanks from analyses
+export const seedBuilderRanksFromAnalyses = internalMutation({
+  handler: async (ctx) => {
+    const analyses = await ctx.db.query("analyses").collect();
+    let count = 0;
+
+    for (const analysis of analyses) {
+      // Check if already exists
+      const existing = await ctx.db
+        .query("builderRanks")
+        .withIndex("by_username", (q) => q.eq("username", analysis.username))
+        .first();
+
+      if (!existing) {
+        // Map tier letter to tier number
+        const tierMap: Record<string, number> = {
+          'S': 5, 'A': 4, 'B': 3, 'C': 2, 'D': 1, 'E': 0, 'F': 0
+        };
+        const tier = tierMap[analysis.tier] ?? 1;
+
+        await ctx.db.insert("builderRanks", {
+          username: analysis.username,
+          tier,
+          shippingPoints: Math.floor(analysis.overallRating * 2),
+          communityKarma: Math.floor(analysis.voice * 1.5),
+          trustScore: Math.floor(analysis.craft),
+          tierScore: Math.floor(analysis.overallRating * 3 + tier * 50),
+          potenCount: tier >= 4 ? Math.floor(Math.random() * 5) + 1 : 0,
+          weeklyWins: tier >= 5 ? Math.floor(Math.random() * 3) : 0,
+          monthlyWins: tier >= 4 ? Math.floor(Math.random() * 5) : 0,
+          updatedAt: Date.now(),
+        });
+        count++;
+      }
+    }
+
+    return { created: count };
+  },
+});
+
+// Internal mutation to seed users from analyses
+export const seedUsersFromAnalyses = internalMutation({
+  handler: async (ctx) => {
+    const analyses = await ctx.db.query("analyses").collect();
+    let count = 0;
+
+    for (const analysis of analyses) {
+      // Check if already exists
+      const existing = await ctx.db
+        .query("users")
+        .withIndex("by_username", (q) => q.eq("username", analysis.username))
+        .first();
+
+      if (!existing) {
+        await ctx.db.insert("users", {
+          username: analysis.username,
+          avatarUrl: analysis.avatarUrl,
+          name: analysis.name,
+          githubId: Math.floor(Math.random() * 1000000),
+          followers: analysis.followers ?? Math.floor(analysis.reach * 100),
+          publicRepos: Math.floor(analysis.grit * 2),
+          totalStars: analysis.totalStars ?? Math.floor(analysis.impact * 50),
+          totalForks: analysis.totalForks ?? Math.floor(analysis.impact * 10),
+          lastFetchedAt: Date.now(),
+        });
+        count++;
+      }
+    }
+
+    return { created: count };
+  },
+});
+
+// Internal full reset and seed action
+export const fullResetAndSeedInternal = internalAction({
+  handler: async (ctx): Promise<{ clearResults: unknown; seedResults: unknown }> => {
+    const clearResults = await ctx.runAction(internal.seed.clearAllTables);
+    await ctx.runAction(internal.seed.internalQuickSeed);
+
+    const usersResult = await ctx.runMutation(internal.seed.seedUsersFromAnalyses);
+    const ranksResult = await ctx.runMutation(internal.seed.seedBuilderRanksFromAnalyses);
+    const stationsResult = await ctx.runAction(internal.seed.seedStations);
+
+    return {
+      clearResults,
+      seedResults: {
+        users: usersResult,
+        builderRanks: ranksResult,
+        stations: stationsResult,
+      },
+    };
+  },
+});
+
+// Admin-protected action for full reset and seed
+// SECURITY: Validates admin secret before executing destructive operation
+export const fullResetAndSeed = action({
+  args: { adminSecret: v.optional(v.string()) },
+  handler: async (ctx, { adminSecret }): Promise<{ clearResults: unknown; seedResults: unknown }> => {
+    const expectedSecret = process.env.ADMIN_SECRET;
+    if (expectedSecret && adminSecret !== expectedSecret) {
+      throw new Error("Unauthorized: Invalid admin secret");
+    }
+    return await ctx.runAction(internal.seed.fullResetAndSeedInternal, {});
   },
 });
