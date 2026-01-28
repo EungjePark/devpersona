@@ -98,24 +98,24 @@ export function Navigation() {
             </Button>
             {isLoaded && (
               isSignedIn ? (
-                <UserButton afterSignOutUrl="/">
-                  <UserButton.MenuItems>
-                    {githubUsername && (
-                      <>
-                        <UserButton.Link
-                          label="My Profile"
-                          labelIcon={<span className="text-sm">👤</span>}
-                          href={`/profile/${githubUsername}`}
-                        />
-                        <UserButton.Link
-                          label="My Analysis"
-                          labelIcon={<span className="text-sm">📊</span>}
-                          href={`/analyze/${githubUsername}`}
-                        />
-                      </>
-                    )}
-                  </UserButton.MenuItems>
-                </UserButton>
+                githubUsername ? (
+                  <UserButton afterSignOutUrl="/">
+                    <UserButton.MenuItems>
+                      <UserButton.Link
+                        label="My Profile"
+                        labelIcon={<span className="text-sm">👤</span>}
+                        href={`/profile/${githubUsername}`}
+                      />
+                      <UserButton.Link
+                        label="My Analysis"
+                        labelIcon={<span className="text-sm">📊</span>}
+                        href={`/analyze/${githubUsername}`}
+                      />
+                    </UserButton.MenuItems>
+                  </UserButton>
+                ) : (
+                  <UserButton afterSignOutUrl="/" />
+                )
               ) : (
                 <Button size="sm" className="gap-2" onClick={() => setAuthModalOpen(true)}>
                   <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
