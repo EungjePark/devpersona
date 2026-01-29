@@ -1,12 +1,11 @@
 'use client';
 
-import { useState, useCallback, useEffect, memo } from 'react';
+import { useState, useCallback, memo } from 'react';
 import { useMutation, useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import type { Id } from '../../../convex/_generated/dataModel';
 import { cn } from '@/lib/utils';
 import type { BuilderTierLevel } from '@/lib/types';
-import { BUILDER_TIERS } from '@/lib/types';
 import { canVote, getVoteWeight } from '@/lib/builder-rank';
 
 // Product type options
@@ -34,6 +33,7 @@ interface VoteButtonProps {
   initialVoteCount?: number;
   initialWeightedScore?: number;
   size?: 'sm' | 'md' | 'lg';
+  variant?: 'default' | 'prominent';
   className?: string;
 }
 
@@ -46,6 +46,7 @@ export const VoteButton = memo(function VoteButton({
   initialVoteCount = 0,
   initialWeightedScore = 0,
   size = 'md',
+  variant = 'default',
   className,
 }: VoteButtonProps) {
   const [isVoting, setIsVoting] = useState(false);
@@ -67,7 +68,6 @@ export const VoteButton = memo(function VoteButton({
   const voteCount = voteInfo?.count ?? initialVoteCount;
   const weightedScore = voteInfo?.weightedScore ?? initialWeightedScore;
 
-  const tierInfo = BUILDER_TIERS[voterTier];
   const baseVoteWeight = getVoteWeight(voterTier);
   const canUserVote = canVote(voterTier);
   const isSelfVote = launchOwnerUsername === voterUsername;
@@ -96,7 +96,7 @@ export const VoteButton = memo(function VoteButton({
     setError(null);
 
     if (!canUserVote) {
-      setError('Reach Cadet (T1) to vote');
+      setError('Sign in to vote');
       return;
     }
 
@@ -143,6 +143,225 @@ export const VoteButton = memo(function VoteButton({
     lg: 'w-16',
   };
 
+  // ============================================
+  // Prominent Variant (ProductHunt Style)
+  // ============================================
+  if (variant === 'prominent') {
+    return (
+      <div className={cn("relative", className)}>
+        {/* Main Vote Button - ProductHunt Style */}
+        <button
+          onClick={() => {
+            if (voted) {
+              handleVote();
+            } else if (!isDisabled) {
+              setShowPanel(!showPanel);
+            }
+          }}
+          disabled={isDisabled}
+          className={cn(
+            "w-full py-4 px-6 rounded-xl font-semibold transition-all",
+            "flex items-center justify-center gap-3",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900",
+            voted
+              ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30"
+              : "bg-gradient-to-r from-orange-500 to-rose-500 text-white shadow-lg shadow-orange-500/20 hover:shadow-orange-500/40 hover:scale-[1.02] active:scale-[0.98]",
+            isDisabled && !voted && "opacity-50 cursor-not-allowed hover:scale-100",
+            isVoting && "animate-pulse"
+          )}
+        >
+          {isVoting ? (
+            <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+          ) : voted ? (
+            <>
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+              </svg>
+              <span>Upvoted</span>
+            </>
+          ) : (
+            <>
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
+              </svg>
+              <span>Upvote</span>
+              <span className="px-2 py-0.5 rounded-full bg-white/20 text-sm tabular-nums">
+                {weightedScore}
+              </span>
+            </>
+          )}
+        </button>
+
+        {/* Feedback Panel - Prominent */}
+        {showPanel && !voted && (
+          <div className="absolute top-full left-0 right-0 mt-3 z-50 animate-in slide-in-from-top-2 fade-in duration-150">
+            <div className="p-5 rounded-2xl bg-zinc-900 border border-zinc-700 shadow-2xl">
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="text-base font-semibold text-white">Add your feedback</h4>
+                <button
+                  onClick={() => setShowPanel(false)}
+                  aria-label="Close feedback panel"
+                  className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Product Type */}
+              <div className="mb-4" role="group" aria-labelledby={`prominent-product-type-${launchId}`}>
+                <span id={`prominent-product-type-${launchId}`} className="block text-sm text-zinc-400 mb-3">What type of product is this?</span>
+                <div className="grid grid-cols-3 gap-3">
+                  {PRODUCT_TYPES.map((type) => (
+                    <button
+                      key={type.id}
+                      onClick={() => setProductTypeVote(productTypeVote === type.id ? null : type.id)}
+                      title={type.description}
+                      className={cn(
+                        "flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all",
+                        productTypeVote === type.id
+                          ? cn(type.bg, type.border, type.color, "scale-105")
+                          : "bg-zinc-800/50 border-zinc-700 text-zinc-400 hover:bg-zinc-800 hover:border-zinc-600"
+                      )}
+                    >
+                      <span className="text-2xl">{type.emoji}</span>
+                      <span className="text-xs font-medium">{type.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Demo Visit */}
+              {demoUrl && (
+                <div className="mb-4">
+                  <button
+                    onClick={handleDemoClick}
+                    disabled={!!visitedAt}
+                    className={cn(
+                      "w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-medium transition-all",
+                      visitedAt
+                        ? "bg-emerald-500/10 border-2 border-emerald-500/30 text-emerald-400"
+                        : "bg-zinc-800 border-2 border-zinc-700 text-zinc-300 hover:bg-zinc-700 hover:border-zinc-600 hover:text-white"
+                    )}
+                  >
+                    {visitedAt ? (
+                      <>
+                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                        <span>Demo visited — 5x vote weight!</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>🌐</span>
+                        <span>Try the demo first (5x weight)</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+
+              {/* Feedback Text */}
+              <div className="mb-4">
+                <label htmlFor={`prominent-feedback-${launchId}`} className="flex items-center justify-between text-sm text-zinc-400 mb-2">
+                  <span>Your feedback (3x weight for 50+ chars)</span>
+                  <span className={cn(
+                    "tabular-nums",
+                    feedbackText.length >= 50 ? "text-emerald-400 font-medium" : ""
+                  )}>
+                    {feedbackText.length}/50
+                  </span>
+                </label>
+                <textarea
+                  id={`prominent-feedback-${launchId}`}
+                  value={feedbackText}
+                  onChange={(e) => setFeedbackText(e.target.value)}
+                  placeholder="What did you like? Any suggestions for improvement?…"
+                  rows={3}
+                  className={cn(
+                    "w-full px-4 py-3 rounded-xl text-sm resize-none",
+                    "bg-zinc-800 border-2 border-zinc-700",
+                    "text-white placeholder:text-zinc-500",
+                    "focus:outline-none focus:border-violet-500/50",
+                    "transition-colors",
+                    feedbackText.length >= 50 && "border-emerald-500/30"
+                  )}
+                />
+              </div>
+
+              {/* Weight Preview */}
+              <div className="flex items-center justify-between mb-4 px-4 py-3 rounded-xl bg-gradient-to-r from-violet-500/10 to-fuchsia-500/10 border border-violet-500/20">
+                <span className="text-sm text-zinc-300">Your vote power:</span>
+                <span className="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-violet-400 to-fuchsia-400">
+                  +{effectiveWeight} pts
+                </span>
+              </div>
+
+              {/* Actions */}
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => handleVote(true)}
+                  disabled={isVoting}
+                  className={cn(
+                    "px-4 py-3 rounded-xl text-sm font-medium transition-all",
+                    "bg-zinc-800 border border-zinc-700 text-zinc-300",
+                    "hover:bg-zinc-700 hover:text-white",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500",
+                    "disabled:opacity-50"
+                  )}
+                >
+                  Quick Vote (+{baseVoteWeight})
+                </button>
+                <button
+                  onClick={() => handleVote(false)}
+                  disabled={isVoting}
+                  className={cn(
+                    "px-4 py-3 rounded-xl text-sm font-semibold transition-all",
+                    "bg-gradient-to-r from-orange-500 to-rose-500 text-white",
+                    "hover:from-orange-400 hover:to-rose-400 hover:shadow-lg hover:shadow-orange-500/20",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500",
+                    "disabled:opacity-50"
+                  )}
+                >
+                  {isVoting ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      Voting…
+                    </span>
+                  ) : (
+                    `Submit (+${effectiveWeight})`
+                  )}
+                </button>
+              </div>
+
+              {/* Error */}
+              {error && (
+                <p className="mt-3 text-sm text-red-400 text-center">{error}</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Error display */}
+        {error && !showPanel && (
+          <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-sm text-red-400 whitespace-nowrap">
+            {error}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ============================================
+  // Default Variant (Compact)
+  // ============================================
   return (
     <div className={cn("relative", sizeStyles[size], className)}>
       {/* Vote Button */}
@@ -157,14 +376,15 @@ export const VoteButton = memo(function VoteButton({
           }}
           disabled={isDisabled}
           title={
-            !canUserVote ? `Reach Cadet (T1) to vote. Current: ${tierInfo.name}` :
+            !canUserVote ? 'Sign in to vote' :
             isSelfVote ? "Can't vote for yourself" :
             voted ? 'Click to remove vote' :
-            'Click to vote'
+            `Vote (weight: ${baseVoteWeight})`
           }
           className={cn(
             "w-10 h-10 rounded-lg flex items-center justify-center transition-all",
             "border",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500",
             voted
               ? "bg-violet-500/20 border-violet-500/50 text-violet-400"
               : "bg-white/5 border-white/10 text-zinc-400 hover:bg-white/10 hover:border-white/20 hover:text-white",
@@ -173,16 +393,16 @@ export const VoteButton = memo(function VoteButton({
           )}
         >
           {isVoting ? (
-            <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+            <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
             </svg>
           ) : voted ? (
-            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
               <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
             </svg>
           ) : (
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
             </svg>
           )}
@@ -367,11 +587,11 @@ export function VoteDisplay({
       <div className={cn(
         "w-10 h-10 rounded-lg flex items-center justify-center",
         "bg-white/5 border border-white/10",
-        isPoten && "border-orange-500/30 bg-orange-500/10"
+        isPoten && "border-violet-500/30 bg-violet-500/10"
       )}>
         <span className={cn(
           "text-base font-bold tabular-nums",
-          isPoten ? "text-orange-400" : "text-white"
+          isPoten ? "text-violet-400" : "text-white"
         )}>
           {weightedScore}
         </span>
@@ -381,7 +601,7 @@ export function VoteDisplay({
           {voteCount} {voteCount === 1 ? 'vote' : 'votes'}
         </div>
         {isPoten && (
-          <div className="text-[10px] text-orange-400">🔥 Poten</div>
+          <div className="text-[10px] text-violet-400">🛸 Orbit</div>
         )}
       </div>
     </div>
